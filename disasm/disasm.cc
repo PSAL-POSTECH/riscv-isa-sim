@@ -773,6 +773,8 @@ disassembler_t::disassembler_t(int xlen)
   DEFINE_RTYPE(sub);
   DEFINE_RTYPE(sll);
   DEFINE_RTYPE(slt);
+  DEFINE_RTYPE(torchsim_mvin);
+  DEFINE_RTYPE(torchsim_mvout);
   add_insn(new disasm_insn_t("snez", match_sltu, mask_sltu | mask_rs1, {&xrd, &xrs2}));
   DEFINE_RTYPE(sltu);
   DEFINE_RTYPE(xor);

@@ -118,6 +118,8 @@ riscv_insn_ext_i = \
 	xori \
 	fence \
 	fence_i \
+	torchsim_mvin \
+	torchsim_mvout \
 
 riscv_insn_ext_a = \
 	amoadd_d \
