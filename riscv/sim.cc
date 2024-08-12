@@ -40,7 +40,7 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
 #ifdef HAVE_BOOST_ASIO
              boost::asio::io_service *io_service_ptr, boost::asio::ip::tcp::acceptor *acceptor_ptr, // option -s
 #endif
-             FILE *cmd_file) // needed for command line option --cmd
+             FILE *cmd_file, uint32_t n_vu) // needed for command line option --cmd
   : htif_t(args),
     mems(mems),
     plugin_devices(plugin_devices),
@@ -53,6 +53,7 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
     dtb_enabled(dtb_enabled),
     log_file(log_path),
     cmd_file(cmd_file),
+    n_vu(n_vu),
 #ifdef HAVE_BOOST_ASIO
     io_service_ptr(io_service_ptr), // socket interface
     acceptor_ptr(acceptor_ptr),
@@ -88,10 +89,11 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
       exit(1);
   }
 
+  std::pair<reg_t, reg_t> vu_sram_space = std::make_pair(reg_t(mems.back().first), reg_t(mems.back().second->size()));
   for (size_t i = 0; i < nprocs; i++) {
     int hart_id = hartids.empty() ? i : hartids[i];
     procs[i] = new processor_t(isa, priv, varch, this, hart_id, halted,
-                               log_file.get(), sout_);
+                               log_file.get(), sout_, n_vu, vu_sram_space);
   }
 
   make_dtb();

@@ -8,6 +8,7 @@
 #include "abstract_device.h"
 #include <string>
 #include <vector>
+#include <queue>
 #include <unordered_map>
 #include <map>
 #include <cassert>
@@ -277,7 +278,8 @@ class processor_t : public abstract_device_t
 public:
   processor_t(const char* isa, const char* priv, const char* varch,
               simif_t* sim, uint32_t id, bool halt_on_reset,
-              FILE *log_file, std::ostream& sout_); // because of command line option --log and -s we need both
+              FILE *log_file, std::ostream& sout_, uint32_t n_vu,
+              std::pair<reg_t, reg_t> vu_sram_space); // because of command line option --log and -s we need both
   ~processor_t();
 
   void set_debug(bool value);
@@ -479,6 +481,8 @@ private:
   static const size_t OPCODE_CACHE_SIZE = 8191;
   insn_desc_t opcode_cache[OPCODE_CACHE_SIZE];
 
+  uint32_t n_vu;
+
   void take_pending_interrupt() { take_interrupt(state.mip->read() & state.mie->read()); }
   void take_interrupt(reg_t mask); // take first enabled interrupt in mask
   void take_trap(trap_t& t, reg_t epc); // take an exception
@@ -512,7 +516,7 @@ public:
   class vectorUnit_t {
     public:
       processor_t* p;
-      void *reg_file;
+      void **reg_file;
       char reg_referenced[NVPR];
       int setvl_count;
       reg_t vlmax;
@@ -525,10 +529,16 @@ public:
       reg_t ELEN, VLEN;
       bool vill;
       bool vstart_alu;
+      uint32_t n_vu;
+      std::pair<reg_t, reg_t> sram_space;
+      reg_t mm_stride;
+
+      // VU SRAM
+      reg_t vu_sram_byte = 128 << 10;
 
       // vector element for varies SEW
       template<class T>
-        T& elt(reg_t vReg, reg_t n, bool is_write = false){
+        T& elt(reg_t vReg, reg_t n, bool is_write = false, uint32_t vu_idx = 0){
           assert(vsew != 0);
           assert((VLEN >> 3)/sizeof(T) > 0);
           reg_t elts_per_reg = (VLEN >> 3) / (sizeof(T));
@@ -545,8 +555,8 @@ public:
           if (is_write)
             p->get_state()->log_reg_write[((vReg) << 4) | 2] = {0, 0};
 #endif
-
-          T *regStart = (T*)((char*)reg_file + vReg * (VLEN >> 3));
+          // printf("int elt vu idx = %u, %lu\n", vu_idx, vReg * (VLEN >> 3));
+          T *regStart = (T*)((char*)reg_file[vu_idx] + vReg * (VLEN >> 3));
           return regStart[n];
         }
     public:
@@ -576,8 +586,14 @@ public:
       }
 
       ~vectorUnit_t(){
-        free(reg_file);
-        reg_file = 0;
+        if (reg_file) {
+          for (int vu_idx=0; vu_idx<n_vu; vu_idx++)
+            if (reg_file[vu_idx]) {
+              free(reg_file[vu_idx]);
+            }
+          free(reg_file);
+          reg_file = 0;
+        }
       }
 
       reg_t set_vl(int rd, int rs1, reg_t reqVL, reg_t newType);
@@ -589,9 +605,90 @@ public:
       VRM get_vround_mode() {
         return (VRM)(vxrm->read());
       }
+
+      uint32_t get_vu_num() {
+        return n_vu;
+      }
+  };
+
+  class systolicArray_t {
+    public:
+      processor_t* p;
+      uint32_t sa_dim;
+      std::queue<float> **i_fifo;
+      std::queue<float> **w_fifo;
+      std::queue<float> **output;
+
+      int queue_max;
+
+    public:
+
+      void reset();
+
+      systolicArray_t():
+        p(0),
+        sa_dim(0),
+        i_fifo(0),
+        w_fifo(0),
+        output(0),
+        queue_max(32) {
+      }
+
+      ~systolicArray_t() {
+        if (i_fifo) {
+          for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+            delete i_fifo[dim_idx];
+          free(i_fifo);
+        }
+        if (w_fifo) {
+          for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+            delete w_fifo[dim_idx];
+          free(w_fifo);
+        }
+        if (output) {
+          for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+            delete output[dim_idx];
+          free(output);
+        }
+      }
+
+      void input_vpush(uint32_t dim_idx, int32_t val) {
+        i_fifo[dim_idx]->push(val);
+      }
+
+      void weight_vpush(uint32_t dim_idx, int32_t val) {
+        w_fifo[dim_idx]->push(val);
+      }
+
+      void output_push(uint32_t dim_idx, float val) {
+        output[dim_idx]->push(val);
+      }
+
+      float input_vpop(uint32_t dim_idx) {
+        float val = i_fifo[dim_idx]->front();
+        i_fifo[dim_idx]->pop();
+        return val;
+      }
+
+      float weight_vpop(uint32_t dim_idx) {
+        float val = w_fifo[dim_idx]->front();
+        w_fifo[dim_idx]->pop();
+        return val;
+      }
+
+      float output_pop(uint32_t dim_idx) {
+        float val = output[dim_idx]->front();
+        output[dim_idx]->pop();
+        return val;
+      }
+
+      uint32_t get_sa_dim() {
+        return sa_dim;
+      }
   };
 
   vectorUnit_t VU;
+  systolicArray_t SA;
 };
 
 reg_t illegal_instruction(processor_t* p, insn_t insn, reg_t pc);

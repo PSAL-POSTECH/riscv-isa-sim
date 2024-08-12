@@ -42,7 +42,7 @@ public:
 #ifdef HAVE_BOOST_ASIO
         boost::asio::io_service *io_service_ptr_ctor, boost::asio::ip::tcp::acceptor *acceptor_ptr_ctor,  // option -s
 #endif
-        FILE *cmd_file); // needed for command line option --cmd
+        FILE *cmd_file, uint32_t n_vu); // needed for command line option --cmd
   ~sim_t();
 
   // run the simulation to completion
@@ -88,6 +88,8 @@ private:
   log_file_t log_file;
 
   FILE *cmd_file; // pointer to debug command input file
+
+  uint32_t n_vu;
 
 #ifdef HAVE_BOOST_ASIO
   // the following are needed for command socket interface

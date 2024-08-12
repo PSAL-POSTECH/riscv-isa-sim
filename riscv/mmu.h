@@ -20,6 +20,9 @@ const reg_t PGSIZE = 1 << PGSHIFT;
 const reg_t PGMASK = ~(PGSIZE-1);
 #define MAX_PADDR_BITS 56 // imposed by Sv39 / Sv48
 
+#define VU_SRAM_VA_BASE 0xA0000000
+#define VU_SRAM_PA_BASE 0xC0000000
+
 struct insn_fetch_t
 {
   insn_func_t func;
@@ -96,8 +99,16 @@ public:
 #endif
 
   // template for functions that load an aligned value from memory
+  // Todo: Need to make VU SRAM address space configurable
   #define load_func(type, prefix, xlate_flags) \
     inline type##_t prefix##_##type(reg_t addr, bool require_alignment = false) { \
+      if (addr >= VU_SRAM_VA_BASE && addr < VU_SRAM_VA_BASE + 524288) { \
+        reg_t offset = addr - VU_SRAM_VA_BASE; \
+        reg_t pa = offset + VU_SRAM_PA_BASE; \
+        auto host_addr = sim->addr_to_mem(pa); \
+        type##_t data = from_target(*(target_endian<type##_t>*)host_addr); \
+        return data; \
+      } \
       if (unlikely(addr & (sizeof(type##_t)-1))) { \
         if (require_alignment) load_reserved_address_misaligned(addr); \
         else return misaligned_load(addr, sizeof(type##_t), xlate_flags); \
@@ -158,8 +169,21 @@ public:
 #endif
 
   // template for functions that store an aligned value to memory
+  // Todo: Need to make VU SRAM address space configurable
   #define store_func(type, prefix, xlate_flags) \
     void prefix##_##type(reg_t addr, type##_t val) { \
+      if (addr >= VU_SRAM_VA_BASE && addr < VU_SRAM_VA_BASE + 524288) { \
+        reg_t offset = addr - VU_SRAM_VA_BASE; \
+        reg_t pa = offset + VU_SRAM_PA_BASE; \
+        target_endian<type##_t> target_val = to_target(val); \
+        if (auto host_addr = sim->addr_to_mem(pa)) { \
+          memcpy(host_addr, (uint8_t *)&target_val, sizeof(target_val)); \
+          return; \
+        } else { \
+          mmio_store(pa, sizeof(target_val), (uint8_t *)&target_val); \
+          return; \
+        } \
+      } \
       if (unlikely(addr & (sizeof(type##_t)-1))) \
         return misaligned_store(addr, val, sizeof(type##_t), xlate_flags); \
       reg_t vpn = addr >> PGSHIFT; \

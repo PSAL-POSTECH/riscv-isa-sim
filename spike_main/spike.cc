@@ -378,9 +378,21 @@ int main(int argc, char** argv)
   });
 
   auto argv1 = parser.parse(argv);
+  uint32_t n_vu = 4;
   std::vector<std::string> htif_args(argv1, (const char*const*)argv + argc);
-  if (mems.empty())
-    mems = make_mems("2048");
+  if (mems.empty()) {
+    reg_t vu_sram_byte = 128 << 10;  // 128 KB
+    reg_t main_mem_byte = 1<<30; // 1 GB
+    reg_t base_addr = 0x80000000;
+    char mem_opt[100];
+    sprintf(mem_opt, "0x%lx:0x%lx,0x%lx:0x%lx", base_addr, main_mem_byte, base_addr+main_mem_byte, vu_sram_byte*n_vu);
+    printf("mem opt > %s\n", mem_opt);
+    mems = make_mems(mem_opt);
+  }
+
+  for (auto& m : mems) {
+    printf("MEM >> Base Addr: %lx, Size: %lx\n", m.first, m.second->size());
+  }
 
   if (!*argv1)
     help();
@@ -440,7 +452,7 @@ int main(int argc, char** argv)
 #ifdef HAVE_BOOST_ASIO
       io_service_ptr, acceptor_ptr,
 #endif
-      cmd_file);
+      cmd_file, n_vu);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));

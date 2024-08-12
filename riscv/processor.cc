@@ -25,13 +25,17 @@
 
 processor_t::processor_t(const char* isa, const char* priv, const char* varch,
                          simif_t* sim, uint32_t id, bool halt_on_reset,
-                         FILE* log_file, std::ostream& sout_)
+                         FILE* log_file, std::ostream& sout_, uint32_t n_vu,
+                         std::pair<reg_t, reg_t> vu_sram_space)
   : debug(false), halt_request(HR_NONE), sim(sim), id(id), xlen(0),
   histogram_enabled(false), log_commits_enabled(false),
-  log_file(log_file), sout_(sout_.rdbuf()), halt_on_reset(halt_on_reset),
+  log_file(log_file), sout_(sout_.rdbuf()), n_vu(n_vu),halt_on_reset(halt_on_reset),
   extension_table(256, false), impl_table(256, false), last_pc(1), executions(1)
 {
   VU.p = this;
+  VU.n_vu = n_vu;
+  VU.sram_space = vu_sram_space;
+  SA.sa_dim = n_vu;
 
   parse_isa_string(isa);
   parse_priv_string(priv);
@@ -560,11 +564,22 @@ void state_t::reset(processor_t* const proc, reg_t max_isa)
 }
 
 void processor_t::vectorUnit_t::reset(){
-  free(reg_file);
+  if (reg_file) {
+    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
+      if (reg_file[vu_idx]) {
+        free(reg_file[vu_idx]);
+      }
+    }
+    free(reg_file);
+    reg_file = 0;
+  }
   VLEN = get_vlen();
   ELEN = get_elen();
-  reg_file = malloc(NVPR * vlenb);
-  memset(reg_file, 0, NVPR * vlenb);
+  reg_file = (void**)malloc(n_vu * sizeof(void *));
+  for (int vu_idx=0; vu_idx<n_vu; vu_idx++){
+    reg_file[vu_idx] = malloc(NVPR * vlenb);
+    memset(reg_file[vu_idx], 0, NVPR * vlenb);
+  }
 
   auto& csrmap = p->get_state()->csrmap;
   csrmap[CSR_VXSAT] = vxsat = std::make_shared<vxsat_csr_t>(p, CSR_VXSAT);
@@ -617,6 +632,35 @@ reg_t processor_t::vectorUnit_t::set_vl(int rd, int rs1, reg_t reqVL, reg_t newT
   return vl->read();
 }
 
+void processor_t::systolicArray_t::reset() {
+  if (i_fifo) {
+    for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+      delete i_fifo[dim_idx];
+    free(i_fifo);
+  }
+  if (w_fifo) {
+    for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+      delete w_fifo[dim_idx];
+    free(w_fifo);
+  }
+  if (output) {
+    for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+      delete output[dim_idx];
+    free(output);
+  }
+
+  i_fifo = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
+  w_fifo = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
+  output = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
+
+  for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+    i_fifo[dim_idx] = new std::queue<float>();
+  for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+    w_fifo[dim_idx] = new std::queue<float>();
+  for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+    output[dim_idx] = new std::queue<float>();
+}
+
 void processor_t::set_debug(bool value)
 {
   debug = value;
@@ -651,6 +695,7 @@ void processor_t::reset()
   state.dcsr->halt = halt_on_reset;
   halt_on_reset = false;
   VU.reset();
+  SA.reset();
 
   if (n_pmp > 0) {
     // For backwards compatibility with software that is unaware of PMP,
