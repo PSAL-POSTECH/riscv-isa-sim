@@ -613,13 +613,16 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rd_num = insn.rd(); \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
-  for (reg_t i=P.VU.vstart->read(); i<vl; ++i){
+  const uint32_t n_vu = P.VU.get_vu_num(); \
+  for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
+    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
 
 #define VI_LOOP_BASE \
     VI_GENERAL_LOOP_BASE \
     VI_LOOP_ELEMENT_SKIP();
 
 #define VI_LOOP_END \
+    } \
   } \
   P.VU.vstart->write(0);
 
@@ -641,7 +644,8 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   auto &vd = P.VU.elt<uint64_t>(rd_num, midx, true);
 
 #define VI_LOOP_CARRY_END \
-    vd = (vd & ~mmask) | (((res) << mpos) & mmask); \
+      vd = (vd & ~mmask) | (((res) << mpos) & mmask); \
+    } \
   } \
   P.VU.vstart->write(0);
 #define VI_LOOP_WITH_CARRY_BASE \
@@ -741,14 +745,9 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   type_usew_t<x>::type vs2 = P.VU.elt<type_usew_t<x>::type>(rs2_num, i);
 
 #define VV_PARAMS(x) \
-  type_sew_t<x>::type &vd = P.VU.elt<type_sew_t<x>::type>(rd_num, i, true); \
-  type_sew_t<x>::type vs1 = P.VU.elt<type_sew_t<x>::type>(rs1_num, i); \
-  type_sew_t<x>::type vs2 = P.VU.elt<type_sew_t<x>::type>(rs2_num, i);
-
-#define VV_PARAMS_(x, vu_idx) \
   type_sew_t<x>::type &vd = P.VU.elt<type_sew_t<x>::type>(rd_num, i, true, vu_idx); \
   type_sew_t<x>::type vs1 = P.VU.elt<type_sew_t<x>::type>(rs1_num, i, false, vu_idx); \
-  type_sew_t<x>::type vs2 = P.VU.elt<type_sew_t<x>::type>(rs2_num, i, false, vu_idx); \
+  type_sew_t<x>::type vs2 = P.VU.elt<type_sew_t<x>::type>(rs2_num, i, false, vu_idx);
 
 #define VX_PARAMS(x) \
   type_sew_t<x>::type &vd = P.VU.elt<type_sew_t<x>::type>(rd_num, i, true); \
@@ -848,9 +847,9 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   float##width##_t vs2 = P.VU.elt<float##width##_t>(rs2_num, i);
 
 #define VFP_VV_PARAMS(width) \
-  float##width##_t &vd = P.VU.elt<float##width##_t>(rd_num, i, true); \
-  float##width##_t vs1 = P.VU.elt<float##width##_t>(rs1_num, i); \
-  float##width##_t vs2 = P.VU.elt<float##width##_t>(rs2_num, i);
+  float##width##_t &vd = P.VU.elt<float##width##_t>(rd_num, i, true, vu_idx); \
+  float##width##_t vs1 = P.VU.elt<float##width##_t>(rs1_num, i, false, vu_idx); \
+  float##width##_t vs2 = P.VU.elt<float##width##_t>(rs2_num, i, false, vu_idx);
 
 #define VFP_VF_PARAMS(width) \
   float##width##_t &vd = P.VU.elt<float##width##_t>(rd_num, i, true); \
@@ -1141,11 +1140,8 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
     VV_PARAMS(e16); \
     BODY; \
   }else if(sew == e32){ \
-    const uint32_t n_vu = P.VU.get_vu_num(); \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
-      VV_PARAMS_(e32, vu_idx); \
-      BODY; \
-    } \
+    VV_PARAMS(e32); \
+    BODY; \
   }else if(sew == e64){ \
     VV_PARAMS(e64); \
     BODY; \
@@ -1974,16 +1970,20 @@ reg_t index[P.VU.vlmax]; \
 
 #define VI_VFP_LOOP_BASE \
   VI_VFP_COMMON \
+  const uint32_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
-    VI_LOOP_ELEMENT_SKIP();
+    VI_LOOP_ELEMENT_SKIP(); \
+    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
 
 #define VI_VFP_LOOP_CMP_BASE \
   VI_VFP_COMMON \
+  const uint32_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i = P.VU.vstart->read(); i < vl; ++i) { \
     VI_LOOP_ELEMENT_SKIP(); \
     uint64_t mmask = UINT64_C(1) << mpos; \
-    uint64_t &vd = P.VU.elt<uint64_t>(rd_num, midx, true); \
-    uint64_t res = 0;
+    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+      uint64_t &vd = P.VU.elt<uint64_t>(rd_num, midx, true); \
+      uint64_t res = 0;
 
 #define VI_VFP_LOOP_REDUCTION_BASE(width) \
   float##width##_t vd_0 = P.VU.elt<float##width##_t>(rd_num, 0); \
@@ -2002,6 +2002,7 @@ reg_t index[P.VU.vlmax]; \
     VI_LOOP_ELEMENT_SKIP();
 
 #define VI_VFP_LOOP_END \
+  } \
   } \
   P.VU.vstart->write(0); \
 
@@ -2057,17 +2058,18 @@ reg_t index[P.VU.vlmax]; \
   }
 
 #define VI_VFP_LOOP_CMP_END \
-  switch(P.VU.vsew) { \
-    case e16: \
-    case e32: \
-    case e64: { \
-      vd = (vd & ~mmask) | (((res) << mpos) & mmask); \
-      break; \
+    switch(P.VU.vsew) { \
+      case e16: \
+      case e32: \
+      case e64: { \
+        vd = (vd & ~mmask) | (((res) << mpos) & mmask); \
+        break; \
+      } \
+      default: \
+        require(0); \
+        break; \
+      }; \
     } \
-    default: \
-      require(0); \
-      break; \
-    }; \
   } \
   P.VU.vstart->write(0);
 
@@ -2394,8 +2396,10 @@ reg_t index[P.VU.vlmax]; \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
   softfloat_roundingMode = STATE.frm->read(); \
+  const uint32_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
-    VI_LOOP_ELEMENT_SKIP();
+    VI_LOOP_ELEMENT_SKIP(); \
+    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
 
 #define VI_VFP_CVT_SCALE(BODY8, BODY16, BODY32, \
                          CHECK8, CHECK16, CHECK32, \

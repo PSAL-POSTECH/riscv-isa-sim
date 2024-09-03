@@ -20,7 +20,7 @@ const reg_t PGSIZE = 1 << PGSHIFT;
 const reg_t PGMASK = ~(PGSIZE-1);
 #define MAX_PADDR_BITS 56 // imposed by Sv39 / Sv48
 
-#define VU_SRAM_VA_BASE 0xA0000000
+#define VU_SRAM_VA_BASE 0xA000000
 #define VU_SRAM_PA_BASE 0xC0000000
 
 struct insn_fetch_t
