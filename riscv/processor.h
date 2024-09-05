@@ -531,7 +531,14 @@ public:
       bool vstart_alu;
       uint32_t n_vu;
       std::pair<reg_t, reg_t> sram_space;
-      reg_t mm_stride;
+
+      reg_t in_mm_stride = 0;
+      reg_t in_element_size = 0;
+      bool in_is_transpose = false;
+
+      reg_t out_mm_stride = 0;
+      reg_t out_element_size = 0;
+      bool out_is_transpose = false;
 
       // VU SRAM
       reg_t vu_sram_byte = 128 << 10;
