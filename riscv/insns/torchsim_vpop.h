@@ -12,7 +12,7 @@ for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
         VI_STRIP(i);
         P.VU.vstart->write(i);
         uint32_t val = P.SA.output_pop(vu_idx);
-        P.VU.elt<int32_t>(vd, vreg_inx, true, vu_idx) = val;
+        P.VU.elt<uint32_t>(vd, vreg_inx, true, vu_idx) = val;
     }
 }
 P.VU.vstart->write(0);

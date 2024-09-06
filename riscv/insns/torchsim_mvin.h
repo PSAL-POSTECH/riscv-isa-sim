@@ -18,11 +18,11 @@ assert(mm_stride > 0);
 assert(element_size > 0);
 
 uint32_t element_per_vlane = is_transpose ? n_col : n_row;
-uint32_t sram_stride = is_transpose ? 1 : mm_stride;    // stride in tiled matrix within vector lane data
-uint32_t vlane_stride = is_transpose ? mm_stride : 1;   // stride in tiled matrix between vector lane data
+uint32_t sram_stride = is_transpose ? element_size : mm_stride;    // stride in tiled matrix within vector lane data
+uint32_t vlane_stride = is_transpose ? mm_stride : element_size;   // stride in tiled matrix between vector lane data
 
 for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
-    reg_t dram_base = dramAddr + vu_idx * vlane_stride * element_size;
+    reg_t dram_base = dramAddr + vu_idx * vlane_stride;
     reg_t sram_base = scratchpadAddr + vu_idx * P.VU.vu_sram_byte;
     for (int count_in_vlane=0; count_in_vlane<static_cast<int>(element_per_vlane); count_in_vlane++) {
         reg_t d_addr = dram_base + sram_stride * count_in_vlane;

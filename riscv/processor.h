@@ -622,9 +622,9 @@ public:
     public:
       processor_t* p;
       uint32_t sa_dim;
-      std::queue<float> **i_fifo;
-      std::queue<float> **w_fifo;
-      std::queue<float> **output;
+      std::queue<uint32_t> **i_fifo;
+      std::queue<uint32_t> **w_fifo;
+      std::queue<uint32_t> **output;
 
       int queue_max;
 
@@ -659,32 +659,32 @@ public:
         }
       }
 
-      void input_vpush(uint32_t dim_idx, int32_t val) {
+      void input_vpush(uint32_t dim_idx, uint32_t val) {
         i_fifo[dim_idx]->push(val);
       }
 
-      void weight_vpush(uint32_t dim_idx, int32_t val) {
+      void weight_vpush(uint32_t dim_idx, uint32_t val) {
         w_fifo[dim_idx]->push(val);
       }
 
-      void output_push(uint32_t dim_idx, float val) {
+      void output_push(uint32_t dim_idx, uint32_t val) {
         output[dim_idx]->push(val);
       }
 
-      float input_vpop(uint32_t dim_idx) {
-        float val = i_fifo[dim_idx]->front();
+      uint32_t input_vpop(uint32_t dim_idx) {
+        uint32_t val = i_fifo[dim_idx]->front();
         i_fifo[dim_idx]->pop();
         return val;
       }
 
-      float weight_vpop(uint32_t dim_idx) {
-        float val = w_fifo[dim_idx]->front();
+      uint32_t weight_vpop(uint32_t dim_idx) {
+        uint32_t val = w_fifo[dim_idx]->front();
         w_fifo[dim_idx]->pop();
         return val;
       }
 
-      float output_pop(uint32_t dim_idx) {
-        float val = output[dim_idx]->front();
+      uint32_t output_pop(uint32_t dim_idx) {
+        uint32_t val = output[dim_idx]->front();
         output[dim_idx]->pop();
         return val;
       }
