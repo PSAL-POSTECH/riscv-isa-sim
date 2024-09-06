@@ -71,8 +71,9 @@ static void help(int exit_code = 1)
   fprintf(stderr, "  --dm-no-hasel         Debug module supports hasel\n");
   fprintf(stderr, "  --dm-no-abstract-csr  Debug module won't support abstract to authenticate\n");
   fprintf(stderr, "  --dm-no-halt-groups   Debug module won't support halt groups\n");
-  fprintf(stderr, "  --dm-no-impebreak     Debug module won't support implicit ebreak in program buffer\n");
-
+  fprintf(stderr, "  --scratchpad-base-paddr=<addr> Scratchpad base physical address\n");
+  fprintf(stderr, "  --scratchpad-base-vaddr=<addr> Scratchpad base virtual address\n");
+  fprintf(stderr, "  --scratchpad-size=<size>       Scratchpad size\n");
   exit(exit_code);
 }
 
@@ -400,7 +401,9 @@ int main(int argc, char** argv)
     printf("mem opt > %s\n", mem_opt);
     mems = make_mems(mem_opt);
   }
-
+  printf("Number of vectorlane: %d\n", vectorlane_size);
+  printf("Scratchpad base physical address: 0x%lx\n", scratchpad_base_paddr);
+  printf("Scratchpad base virtual address: 0x%lx\n", scratchpad_base_vaddr);
   for (auto& m : mems) {
     printf("MEM >> Base Addr: %lx, Size: %lx\n", m.first, m.second->size());
   }
