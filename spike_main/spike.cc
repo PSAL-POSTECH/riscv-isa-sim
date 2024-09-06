@@ -254,7 +254,7 @@ int main(int argc, char** argv)
   };
   std::vector<int> hartids;
   uint64_t scratchpad_base_paddr = 0xC0000000;
-  uint64_t scratchpad_base_vaddr = 0xC0000000;
+  uint64_t scratchpad_base_vaddr = 0x0A000000;
   uint64_t scratchpad_size = 128 << 10; // 128 KB
   uint32_t vectorlane_size = 4;
 

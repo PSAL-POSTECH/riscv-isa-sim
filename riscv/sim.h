@@ -71,7 +71,7 @@ public:
   void proc_reset(unsigned id);
   uint64_t get_spad_paddr() { return scratchpad_base_paddr; }
   uint64_t get_spad_vaddr() { return scratchpad_base_vaddr; }
-  uint64_t get_spad_size() { return scratchpad_size; }
+  uint64_t get_spad_size() { return scratchpad_size * n_vu; }
 
 private:
   std::vector<std::pair<reg_t, mem_t*>> mems;
