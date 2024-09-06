@@ -3,7 +3,7 @@ const reg_t vl = P.VU.vl->read();
 const uint32_t n_vu = P.VU.get_vu_num();
 const reg_t vstart = P.VU.vstart->read();
 
-for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
+for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
     P.VU.vstart->write(vstart);
     for (reg_t i = 0; i < vl; ++i) {
         VI_STRIP(i);

@@ -5,5 +5,5 @@
 // rs2[32] = is transpose (is row-wise)
 
 P.VU.in_mm_stride = RS1;
-P.VU.in_element_size = (RS2 & ((1 << 32) - 1));
+P.VU.in_element_size = (RS2 & ((1ULL << 32) - 1));
 P.VU.in_is_transpose = (RS2 >> 32) & 1;

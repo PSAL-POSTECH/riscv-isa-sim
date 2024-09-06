@@ -565,7 +565,7 @@ void state_t::reset(processor_t* const proc, reg_t max_isa)
 
 void processor_t::vectorUnit_t::reset(){
   if (reg_file) {
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
       if (reg_file[vu_idx]) {
         free(reg_file[vu_idx]);
       }
@@ -576,7 +576,7 @@ void processor_t::vectorUnit_t::reset(){
   VLEN = get_vlen();
   ELEN = get_elen();
   reg_file = (void**)malloc(n_vu * sizeof(void *));
-  for (int vu_idx=0; vu_idx<n_vu; vu_idx++){
+  for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++){
     reg_file[vu_idx] = malloc(NVPR * vlenb);
     memset(reg_file[vu_idx], 0, NVPR * vlenb);
   }
@@ -634,17 +634,17 @@ reg_t processor_t::vectorUnit_t::set_vl(int rd, int rs1, reg_t reqVL, reg_t newT
 
 void processor_t::systolicArray_t::reset() {
   if (i_fifo) {
-    for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+    for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
       delete i_fifo[dim_idx];
     free(i_fifo);
   }
   if (w_fifo) {
-    for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+    for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
       delete w_fifo[dim_idx];
     free(w_fifo);
   }
   if (output) {
-    for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+    for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
       delete output[dim_idx];
     free(output);
   }
@@ -653,11 +653,11 @@ void processor_t::systolicArray_t::reset() {
   w_fifo = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
   output = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
 
-  for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+  for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
     i_fifo[dim_idx] = new std::queue<float>();
-  for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+  for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
     w_fifo[dim_idx] = new std::queue<float>();
-  for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+  for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
     output[dim_idx] = new std::queue<float>();
 }
 

@@ -252,6 +252,10 @@ int main(int argc, char** argv)
     .support_impebreak = true
   };
   std::vector<int> hartids;
+  uint64_t scratchpad_base_paddr = 0xC0000000;
+  uint64_t scratchpad_base_vaddr = 0xC0000000;
+  uint64_t scratchpad_size = 128 << 10; // 128 KB
+  uint32_t vectorlane_size = 4;
 
   auto const hartids_parser = [&](const char *s) {
     std::string const str(s);
@@ -376,16 +380,23 @@ int main(int argc, char** argv)
         exit(-1);
      }
   });
+  parser.option(0, "scratchpad-base-paddr", 1,
+      [&](const char* s){scratchpad_base_paddr = atoul_safe(s);});
+  parser.option(0, "scratchpad-base-vaddr", 1,
+      [&](const char* s){scratchpad_base_vaddr = atoul_safe(s);});
+  parser.option(0, "scratchpad-size", 1,
+      [&](const char* s){scratchpad_size = atoul_safe(s);});
+  parser.option(0, "vectorlane-size", 1,
+      [&](const char* s){vectorlane_size = atoul_safe(s);});
 
   auto argv1 = parser.parse(argv);
-  uint32_t n_vu = 4;
   std::vector<std::string> htif_args(argv1, (const char*const*)argv + argc);
   if (mems.empty()) {
-    reg_t vu_sram_byte = 128 << 10;  // 128 KB
     reg_t main_mem_byte = 1<<30; // 1 GB
     reg_t base_addr = 0x80000000;
     char mem_opt[100];
-    sprintf(mem_opt, "0x%lx:0x%lx,0x%lx:0x%lx", base_addr, main_mem_byte, base_addr+main_mem_byte, vu_sram_byte*n_vu);
+    sprintf(mem_opt, "0x%lx:0x%lx,0x%lx:0x%lx", base_addr, main_mem_byte, scratchpad_base_paddr,
+      scratchpad_size*vectorlane_size);
     printf("mem opt > %s\n", mem_opt);
     mems = make_mems(mem_opt);
   }
@@ -452,7 +463,7 @@ int main(int argc, char** argv)
 #ifdef HAVE_BOOST_ASIO
       io_service_ptr, acceptor_ptr,
 #endif
-      cmd_file, n_vu);
+      cmd_file, scratchpad_base_paddr, scratchpad_base_vaddr, scratchpad_size, vectorlane_size);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));

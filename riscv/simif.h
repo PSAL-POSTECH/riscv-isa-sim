@@ -19,6 +19,9 @@ public:
 
   virtual const char* get_symbol(uint64_t addr) = 0;
 
+  virtual uint64_t get_spad_paddr() = 0;
+  virtual uint64_t get_spad_vaddr() = 0;
+  virtual uint64_t get_spad_size() = 0;
 };
 
 #endif

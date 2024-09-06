@@ -615,7 +615,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rs2_num = insn.rs2(); \
   const uint32_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
 
 #define VI_LOOP_BASE \
     VI_GENERAL_LOOP_BASE \
@@ -666,7 +666,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   const uint32_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     VI_LOOP_ELEMENT_SKIP(); \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) { \
       uint64_t mmask = UINT64_C(1) << mpos; \
       uint64_t &vdi = P.VU.elt<uint64_t>(insn.rd(), midx, true); \
       uint64_t res = 0;
@@ -1645,7 +1645,7 @@ reg_t index[P.VU.vlmax]; \
   VI_CHECK_LOAD(elt_width, is_mask_ldst); \
   const uint32_t n_vu = P.VU.get_vu_num(); \
   const reg_t vstart = P.VU.vstart->read(); \
-  for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+  for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) { \
     P.VU.vstart->write(vstart); \
     for (reg_t i = 0; i < vl; ++i) { \
       VI_ELEMENT_SKIP(i); \
@@ -1708,7 +1708,7 @@ reg_t index[P.VU.vlmax]; \
     VI_ELEMENT_SKIP(i); \
     P.VU.vstart->write(i); \
     for (reg_t fn = 0; fn < nf; ++fn) { \
-      for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+      for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) { \
         elt_width##_t val = P.VU.elt<elt_width##_t>(vs3 + fn * emul, vreg_inx, false, vu_idx); \
         MMU.store_##elt_width( \
           baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t), val); \
@@ -1716,8 +1716,6 @@ reg_t index[P.VU.vlmax]; \
     } \
   } \
   P.VU.vstart->write(0);
-
-// baseAddr + ((stride) + (offset) * sizeof(elt_width##_t)) * n_vu + (vu_idx) * sizeof(elt_width##_t), val); \
 
 #define VI_ST_INDEX(elt_width, is_seg) \
   const reg_t nf = insn.v_nf() + 1; \
@@ -1800,7 +1798,7 @@ reg_t index[P.VU.vlmax]; \
   const uint32_t n_vu = P.VU.get_vu_num(); \
   const reg_t vstart = P.VU.vstart->read(); \
   if (P.VU.vstart->read() < size) { \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) { \
       P.VU.vstart->write(vstart); \
       reg_t i = P.VU.vstart->read() / elt_per_reg; \
       reg_t off = P.VU.vstart->read() % elt_per_reg; \
@@ -1836,7 +1834,7 @@ reg_t index[P.VU.vlmax]; \
   const reg_t vstart = P.VU.vstart->read(); \
   \
   if (P.VU.vstart->read() < size) { \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) { \
       P.VU.vstart->write(vstart); \
       reg_t i = P.VU.vstart->read() / P.VU.vlenb; \
       reg_t off = P.VU.vstart->read() % P.VU.vlenb; \
@@ -1978,7 +1976,7 @@ reg_t index[P.VU.vlmax]; \
   const uint32_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     VI_LOOP_ELEMENT_SKIP(); \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
 
 #define VI_VFP_LOOP_CMP_BASE \
   VI_VFP_COMMON \
@@ -1986,7 +1984,7 @@ reg_t index[P.VU.vlmax]; \
   for (reg_t i = P.VU.vstart->read(); i < vl; ++i) { \
     VI_LOOP_ELEMENT_SKIP(); \
     uint64_t mmask = UINT64_C(1) << mpos; \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) { \
       uint64_t &vd = P.VU.elt<uint64_t>(rd_num, midx, true); \
       uint64_t res = 0;
 
@@ -2404,7 +2402,7 @@ reg_t index[P.VU.vlmax]; \
   const uint32_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     VI_LOOP_ELEMENT_SKIP(); \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
+    for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
 
 #define VI_VFP_CVT_SCALE(BODY8, BODY16, BODY32, \
                          CHECK8, CHECK16, CHECK32, \

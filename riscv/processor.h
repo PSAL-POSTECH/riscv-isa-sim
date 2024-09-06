@@ -594,7 +594,7 @@ public:
 
       ~vectorUnit_t(){
         if (reg_file) {
-          for (int vu_idx=0; vu_idx<n_vu; vu_idx++)
+          for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++)
             if (reg_file[vu_idx]) {
               free(reg_file[vu_idx]);
             }
@@ -643,17 +643,17 @@ public:
 
       ~systolicArray_t() {
         if (i_fifo) {
-          for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
             delete i_fifo[dim_idx];
           free(i_fifo);
         }
         if (w_fifo) {
-          for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
             delete w_fifo[dim_idx];
           free(w_fifo);
         }
         if (output) {
-          for (int dim_idx=0; dim_idx<sa_dim; dim_idx++)
+          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
             delete output[dim_idx];
           free(output);
         }

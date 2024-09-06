@@ -20,9 +20,6 @@ const reg_t PGSIZE = 1 << PGSHIFT;
 const reg_t PGMASK = ~(PGSIZE-1);
 #define MAX_PADDR_BITS 56 // imposed by Sv39 / Sv48
 
-#define VU_SRAM_VA_BASE 0xA000000
-#define VU_SRAM_PA_BASE 0xC0000000
-
 struct insn_fetch_t
 {
   insn_func_t func;
@@ -102,9 +99,9 @@ public:
   // Todo: Need to make VU SRAM address space configurable
   #define load_func(type, prefix, xlate_flags) \
     inline type##_t prefix##_##type(reg_t addr, bool require_alignment = false) { \
-      if (addr >= VU_SRAM_VA_BASE && addr < VU_SRAM_VA_BASE + 524288) { \
-        reg_t offset = addr - VU_SRAM_VA_BASE; \
-        reg_t pa = offset + VU_SRAM_PA_BASE; \
+      if (addr >= sim->get_spad_vaddr() && addr < sim->get_spad_vaddr() + sim->get_spad_size()) { \
+        reg_t offset = addr - sim->get_spad_vaddr(); \
+        reg_t pa = offset + sim->get_spad_paddr(); \
         auto host_addr = sim->addr_to_mem(pa); \
         type##_t data = from_target(*(target_endian<type##_t>*)host_addr); \
         return data; \
@@ -172,9 +169,9 @@ public:
   // Todo: Need to make VU SRAM address space configurable
   #define store_func(type, prefix, xlate_flags) \
     void prefix##_##type(reg_t addr, type##_t val) { \
-      if (addr >= VU_SRAM_VA_BASE && addr < VU_SRAM_VA_BASE + 524288) { \
-        reg_t offset = addr - VU_SRAM_VA_BASE; \
-        reg_t pa = offset + VU_SRAM_PA_BASE; \
+      if (addr >= sim->get_spad_vaddr() && addr < sim->get_spad_vaddr() + sim->get_spad_size()) { \
+        reg_t offset = addr - sim->get_spad_vaddr(); \
+        reg_t pa = offset + sim->get_spad_paddr(); \
         target_endian<type##_t> target_val = to_target(val); \
         if (auto host_addr = sim->addr_to_mem(pa)) { \
           memcpy(host_addr, (uint8_t *)&target_val, sizeof(target_val)); \
