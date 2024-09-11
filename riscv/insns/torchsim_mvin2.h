@@ -9,7 +9,7 @@
 #define COL 1
 
 const reg_t dramAddr = RS1;
-const reg_t setting_idx = 0;
+const reg_t setting_idx = 1;
 const reg_t scratchpadAddr = (uint32_t)(RS2 & ((1ULL << 32) - 1));
 const reg_t n_col = (RS2 >> 32) & ((1 << 16) - 1);
 const reg_t n_row = RS2 >> 48;

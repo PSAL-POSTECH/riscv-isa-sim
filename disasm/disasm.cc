@@ -774,9 +774,10 @@ disassembler_t::disassembler_t(int xlen)
   DEFINE_RTYPE(sll);
   DEFINE_RTYPE(slt);
   DEFINE_RTYPE(torchsim_mvin);
+  DEFINE_RTYPE(torchsim_mvin2);
+  DEFINE_RTYPE(torchsim_mvin3);
   DEFINE_RTYPE(torchsim_mvout);
-  DEFINE_RTYPE(torchsim_config_mvin);
-  DEFINE_RTYPE(torchsim_config_mvout);
+  DEFINE_RTYPE(torchsim_config);
   DEFINE_RTYPE(torchsim_i_vpush);
   DEFINE_RTYPE(torchsim_w_vpush);
   DEFINE_RTYPE(torchsim_vpop);
