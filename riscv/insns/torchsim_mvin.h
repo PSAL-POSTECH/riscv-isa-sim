@@ -36,13 +36,14 @@ assert(n_used_vlane <= n_vu);
 
 const reg_t block_h = lane_split_axis ? n_row : n_row / n_used_vlane;
 const reg_t block_w = lane_split_axis ? n_col / n_used_vlane : n_col;
+const reg_t dram_vlane_offet = lane_split_axis ? chunk_size : mm_stride * block_h;
 const reg_t next_element_stride = is_col_major ? mm_stride : element_size;
 const reg_t next_line_stride = is_col_major ? element_size : mm_stride;
 const reg_t logical_block_h = is_col_major ? block_w : block_h;
 const reg_t logical_block_w = is_col_major ? block_h : block_w;
 
 for (int lane_idx=0; lane_idx<static_cast<int>(n_vu); lane_idx++) {
-    reg_t dram_base = dramAddr + lane_idx * chunk_size;
+    reg_t dram_base = dramAddr + lane_idx * dram_vlane_offet;
     reg_t sram_base = scratchpadAddr + lane_idx * P.VU.vu_sram_byte;
     if (lane_idx < static_cast<int>(n_used_vlane)) {
         for (int b_h=0; b_h<static_cast<int>(logical_block_h); b_h++) {
