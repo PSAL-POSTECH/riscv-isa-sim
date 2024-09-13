@@ -649,16 +649,16 @@ void processor_t::systolicArray_t::reset() {
     free(output);
   }
 
-  i_fifo = (std::queue<uint32_t>**)malloc(sa_dim * sizeof(std::queue<uint32_t> *));
-  w_fifo = (std::queue<uint32_t>**)malloc(sa_dim * sizeof(std::queue<uint32_t> *));
-  output = (std::queue<uint32_t>**)malloc(sa_dim * sizeof(std::queue<uint32_t> *));
+  i_fifo = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
+  w_fifo = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
+  output = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
 
   for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-    i_fifo[dim_idx] = new std::queue<uint32_t>();
+    i_fifo[dim_idx] = new std::queue<float>();
   for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-    w_fifo[dim_idx] = new std::queue<uint32_t>();
+    w_fifo[dim_idx] = new std::queue<float>();
   for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-    output[dim_idx] = new std::queue<uint32_t>();
+    output[dim_idx] = new std::queue<float>();
 }
 
 void processor_t::set_debug(bool value)
