@@ -11,8 +11,8 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
     for (reg_t i=0; i<vl; i++) {
         VI_STRIP(i);
         P.VU.vstart->write(i);
-        float val = P.VU.elt<float>(vs, vreg_inx, true, vu_idx);
-        P.VU.elt<float>(vd, vreg_inx, true, vu_idx) = exp(val);
+        float val = P.VU.elt<float>(vs, vreg_inx, vu_idx, true);
+        P.VU.elt<float>(vd, vreg_inx, vu_idx, true) = exp(val);
     }
 }
 P.VU.vstart->write(0);

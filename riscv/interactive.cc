@@ -343,34 +343,36 @@ void sim_t::interactive_vreg(const std::string& cmd, const std::vector<std::stri
   const int vlen = (int)(p->VU.get_vlen()) >> 3;
   const int elen = (int)(p->VU.get_elen()) >> 3;
   const int num_elem = vlen/elen;
+  const reg_t n_vu = p->VU.get_vu_num();
 
   std::ostream out(sout_.rdbuf());
   out << std::dec << "VLEN=" << (vlen << 3) << " bits; ELEN=" << (elen << 3) << " bits" << std::endl;
-
-  for (int r = rstart; r < rend; ++r) {
-    out << std::setfill (' ') << std::left << std::setw(4) << vr_name[r] << std::right << ": ";
-    for (int e = num_elem-1; e >= 0; --e){
-      uint64_t val;
-      switch(elen){
-        case 8:
-          val = p->VU.elt<uint64_t>(r, e);
-          out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(16) << val << "  ";
-          break;
-        case 4:
-          val = p->VU.elt<uint32_t>(r, e);
-          out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(8) << (uint32_t)val << "  ";
-          break;
-        case 2:
-          val = p->VU.elt<uint16_t>(r, e);
-          out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(8) << (uint16_t)val << "  ";
-          break;
-        case 1:
-          val = p->VU.elt<uint8_t>(r, e);
-          out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(8) << (int)(uint8_t)val << "  ";
-          break;
+  for (reg_t vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++) {
+    for (int r = rstart; r < rend; ++r) {
+      out << std::setfill (' ') << std::left << std::setw(4) << vr_name[r] << std::right << ": ";
+      for (int e = num_elem-1; e >= 0; --e){
+        uint64_t val;
+        switch(elen){
+          case 8:
+            val = p->VU.elt<uint64_t>(r, e, vu_idx);
+            out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(16) << val << "  ";
+            break;
+          case 4:
+            val = p->VU.elt<uint32_t>(r, e, vu_idx);
+            out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(8) << (uint32_t)val << "  ";
+            break;
+          case 2:
+            val = p->VU.elt<uint16_t>(r, e, vu_idx);
+            out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(8) << (uint16_t)val << "  ";
+            break;
+          case 1:
+            val = p->VU.elt<uint8_t>(r, e, vu_idx);
+            out << std::dec << "[" << e << "]: 0x" << std::hex << std::setfill ('0') << std::setw(8) << (int)(uint8_t)val << "  ";
+            break;
+        }
       }
+      out << std::endl;
     }
-    out << std::endl;
   }
 }
 

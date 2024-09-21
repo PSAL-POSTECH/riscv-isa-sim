@@ -7,23 +7,25 @@ require((P.VU.vsew == e16 && p->extension_enabled(EXT_ZFH)) ||
 require(STATE.frm->read() < 0x5);
 
 reg_t vl = P.VU.vl->read();
-
+const reg_t n_vu = P.VU.get_vu_num();
 if (vl > 0 && P.VU.vstart->read() < vl) {
   reg_t rd_num = insn.rd();
 
-  switch(P.VU.vsew) {
-    case e16:
-      P.VU.elt<uint16_t>(rd_num, 0, true) = f16(FRS1).v;
-      break;
-    case e32:
-      P.VU.elt<uint32_t>(rd_num, 0, true) = f32(FRS1).v;
-      break;
-    case e64:
-      if (FLEN == 64)
-        P.VU.elt<uint64_t>(rd_num, 0, true) = f64(FRS1).v;
-      else
-        P.VU.elt<uint64_t>(rd_num, 0, true) = f32(FRS1).v;
-      break;
+  for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
+    switch(P.VU.vsew) {
+      case e16:
+        P.VU.elt<uint16_t>(rd_num, 0, vu_idx, true) = f16(FRS1).v;
+        break;
+      case e32:
+        P.VU.elt<uint32_t>(rd_num, 0, vu_idx, true) = f32(FRS1).v;
+        break;
+      case e64:
+        if (FLEN == 64)
+          P.VU.elt<uint64_t>(rd_num, 0, vu_idx, true) = f64(FRS1).v;
+        else
+          P.VU.elt<uint64_t>(rd_num, 0, vu_idx, true) = f32(FRS1).v;
+        break;
+    }
   }
 }
 P.VU.vstart->write(0);

@@ -12,7 +12,7 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
         VI_STRIP(i);
         P.VU.vstart->write(i);
         float val = P.SA.output_pop(vu_idx);
-        P.VU.elt<float>(vd, vreg_inx, true, vu_idx) = val;
+        P.VU.elt<float>(vd, vreg_inx, vu_idx, true) = val;
     }
 }
 P.VU.vstart->write(0);
