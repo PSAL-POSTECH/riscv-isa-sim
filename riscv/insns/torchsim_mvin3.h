@@ -51,8 +51,19 @@ for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
             for (reg_t b_w=0; b_w<logical_block_w; b_w++) {
                 reg_t d_addr = dram_base + dram_line_offset + next_element_stride * b_w;
                 reg_t s_addr = sram_base + element_size * (b_h * logical_block_w + b_w);
-                uint32_t val = MMU.load_uint32(d_addr);
-                MMU.store_uint32(s_addr, val);
+                if (element_size == 8){
+                    uint64_t val = MMU.load_uint64(d_addr);
+                    MMU.store_uint64(s_addr, val);
+                } else if (element_size == 4){
+                    uint32_t val = MMU.load_uint32(d_addr);
+                    MMU.store_uint32(s_addr, val);
+                } else if (element_size == 2){
+                    uint16_t val = MMU.load_uint16(d_addr);
+                    MMU.store_uint16(s_addr, val);
+                } else if (element_size == 1){
+                    uint8_t val = MMU.load_uint8(d_addr);
+                    MMU.store_uint8(s_addr, val);
+                }
             }
         }
     } else {
@@ -60,7 +71,14 @@ for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
         for (reg_t b_h=0; b_h<logical_block_h; b_h++) {
             for (reg_t b_w=0; b_w<logical_block_w; b_w++) {
                 reg_t s_addr = sram_base + element_size * (b_h * logical_block_w + b_w);
-                MMU.store_uint32(s_addr, 0);
+                if (element_size == 8)
+                    MMU.store_uint64(s_addr, 0);
+                else if (element_size == 4)
+                    MMU.store_uint32(s_addr, 0);
+                else if (element_size == 2)
+                    MMU.store_uint16(s_addr, 0);
+                else if (element_size == 1)
+                    MMU.store_uint8(s_addr, 0);
             }
         }
     }
