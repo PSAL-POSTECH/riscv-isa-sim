@@ -208,6 +208,22 @@ static unsigned long atoul_nonzero_safe(const char* s)
   return res;
 }
 
+static std::pair<reg_t, reg_t> make_kernel_space_info(const char * s) {
+  std::pair<reg_t, reg_t> kernel_addr;
+  std::string str(s);
+  std::string start, end;
+  size_t pos = str.find(':');
+  if (pos != std::string::npos) {
+    start = str.substr(0, pos);
+    end = str.substr(pos + 1);
+    kernel_addr.first = std::stoull(start, nullptr, 16);
+    kernel_addr.second = std::stoull(end, nullptr, 16);
+  }
+  else
+    assert(0);
+  return kernel_addr;
+}
+
 int main(int argc, char** argv)
 {
   bool debug = false;
@@ -257,6 +273,7 @@ int main(int argc, char** argv)
   uint64_t scratchpad_base_vaddr = 0x0A000000;
   uint64_t scratchpad_size = 128 << 10; // 128 KB
   uint32_t vectorlane_size = 4;
+  std::pair<reg_t, reg_t> kernel_addr;
 
   auto const hartids_parser = [&](const char *s) {
     std::string const str(s);
@@ -389,7 +406,8 @@ int main(int argc, char** argv)
       [&](const char* s){scratchpad_size = atoul_safe(s);});
   parser.option(0, "vectorlane-size", 1,
       [&](const char* s){vectorlane_size = atoul_safe(s);});
-
+  parser.option(0, "kernel-addr", 1,
+       [&](const char* s){kernel_addr = make_kernel_space_info(s);});
   auto argv1 = parser.parse(argv);
   std::vector<std::string> htif_args(argv1, (const char*const*)argv + argc);
   if (mems.empty()) {
@@ -404,6 +422,7 @@ int main(int argc, char** argv)
   printf("Number of vectorlane: %d\n", vectorlane_size);
   printf("Scratchpad base physical address: 0x%lx\n", scratchpad_base_paddr);
   printf("Scratchpad base virtual address: 0x%lx\n", scratchpad_base_vaddr);
+  printf("Kernel addr: 0x%lx, 0x%lx\n", kernel_addr.first, kernel_addr.second);
   for (auto& m : mems) {
     printf("MEM >> Base Addr: %lx, Size: %lx\n", m.first, m.second->size());
   }
@@ -466,7 +485,7 @@ int main(int argc, char** argv)
 #ifdef HAVE_BOOST_ASIO
       io_service_ptr, acceptor_ptr,
 #endif
-      cmd_file, scratchpad_base_paddr, scratchpad_base_vaddr, scratchpad_size, vectorlane_size);
+      cmd_file, scratchpad_base_paddr, scratchpad_base_vaddr, scratchpad_size, vectorlane_size, kernel_addr);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));

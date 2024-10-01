@@ -1,6 +1,6 @@
 // vmv1r.v vd, vs2
 const reg_t n_vu = P.VU.get_vu_num();
-for (int vu_idx=0; vu_idx<n_vu; vu_idx++) {
+for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
   require_vector_novtype(true, true);
   const reg_t baseAddr = RS1;
   const reg_t vd = insn.rd();

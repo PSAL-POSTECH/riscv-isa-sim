@@ -410,6 +410,9 @@ public:
     return target_big_endian? target_endian<T>::to_be(n) : target_endian<T>::to_le(n);
   }
 
+  reg_t get_spad_base_vaddr() { return sim->get_spad_vaddr(); }
+  reg_t get_spad_base_paddr() { return sim->get_spad_paddr(); }
+
 private:
   simif_t* sim;
   processor_t* proc;

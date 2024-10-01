@@ -666,7 +666,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rs2_num = insn.rs2(); \
   const reg_t n_vu = P.VU.get_vu_num(); \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
-    for (int vu_idx=0; vu_idx<n_vu; vu_idx++) { \
+    for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       VI_LOOP_ELEMENT_SKIP(); \
       uint64_t mmask = UINT64_C(1) << mpos; \
       uint64_t &vdi = P.VU.elt<uint64_t>(insn.rd(), midx, vu_idx, true); \
@@ -1650,13 +1650,18 @@ reg_t index[P.VU.vlmax]; \
 #define VI_LD(stride, offset, elt_width, is_mask_ldst) \
   const reg_t nf = insn.v_nf() + 1; \
   const reg_t vl = is_mask_ldst ? ((P.VU.vl->read() + 7) / 8) : P.VU.vl->read(); \
-  const reg_t baseAddr = RS1; \
+  reg_t baseAddr = RS1; \
   const reg_t vd = insn.rd(); \
-  reg_t new_baseAddr = baseAddr; \
   reg_t addr = 0; \
   VI_CHECK_LOAD(elt_width, is_mask_ldst); \
   const reg_t n_vu = P.VU.get_vu_num(); \
   const reg_t vstart = P.VU.vstart->read(); \
+  if (P.get_kernel_flag() && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
+    reg_t prev = baseAddr; \
+    reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
+    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+  } \
   P.VU.vstart->write(vstart); \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     for (reg_t i = 0; i < vl; ++i) { \
@@ -1681,6 +1686,8 @@ reg_t index[P.VU.vlmax]; \
   if (!is_seg) \
     require(nf == 1); \
   VI_CHECK_LD_INDEX(elt_width); \
+  if (P.get_kernel_flag()) \
+    printf("VI_LD_INDEX > 0x%lx\n", baseAddr); \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     VI_DUPLICATE_VREG(insn.rs2(), elt_width); \
     for (reg_t i = 0; i < vl; ++i) { \
@@ -1714,9 +1721,15 @@ reg_t index[P.VU.vlmax]; \
 #define VI_ST(stride, offset, elt_width, is_mask_ldst) \
   const reg_t nf = insn.v_nf() + 1; \
   const reg_t vl = is_mask_ldst ? ((P.VU.vl->read() + 7) / 8) : P.VU.vl->read(); \
-  const reg_t baseAddr = RS1; \
+  reg_t baseAddr = RS1; \
   const reg_t vs3 = insn.rd(); \
   VI_CHECK_STORE(elt_width, is_mask_ldst); \
+  if (P.get_kernel_flag() && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
+    reg_t prev = baseAddr; \
+    reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
+    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+  } \
   const reg_t n_vu = P.VU.get_vu_num(); \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     for (reg_t i = 0; i < vl; ++i) { \
@@ -1742,6 +1755,8 @@ reg_t index[P.VU.vlmax]; \
   if (!is_seg) \
     require(nf == 1); \
   VI_CHECK_ST_INDEX(elt_width); \
+  if (P.get_kernel_flag()) \
+    printf("VI_ST_INDEX > 0x%lx\n", baseAddr); \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     VI_DUPLICATE_VREG(insn.rs2(), elt_width);   \
     for (reg_t i = 0; i < vl; ++i) { \
@@ -1781,6 +1796,8 @@ reg_t index[P.VU.vlmax]; \
   const reg_t n_vu = P.VU.get_vu_num(); \
   VI_CHECK_LOAD(elt_width, false); \
   bool early_stop = false; \
+  if (P.get_kernel_flag()) \
+    printf("VI_LDST_FF > 0x%lx\n", baseAddr); \
   for (reg_t i = p->VU.vstart->read(); i < vl; ++i) { \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       VI_STRIP(i); \
@@ -1811,7 +1828,7 @@ reg_t index[P.VU.vlmax]; \
 
 #define VI_LD_WHOLE(elt_width) \
   require_vector_novtype(true, false); \
-  const reg_t baseAddr = RS1; \
+  reg_t baseAddr = RS1; \
   const reg_t vd = insn.rd(); \
   const reg_t len = insn.v_nf() + 1; \
   require_align(vd, len); \
@@ -1819,6 +1836,12 @@ reg_t index[P.VU.vlmax]; \
   const reg_t size = len * elt_per_reg; \
   const reg_t n_vu = P.VU.get_vu_num(); \
   const reg_t vstart = P.VU.vstart->read(); \
+  if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
+    reg_t prev = baseAddr; \
+    reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
+    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+  } \
   if (P.VU.vstart->read() < size) { \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       P.VU.vstart->write(vstart); \
@@ -1826,7 +1849,7 @@ reg_t index[P.VU.vlmax]; \
       reg_t off = P.VU.vstart->read() % elt_per_reg; \
       if (off) { \
         for (reg_t pos = off; pos < elt_per_reg; ++pos) { \
-          auto val = MMU.load_## elt_width(baseAddr + \
+          auto val = MMU.load_## elt_width(baseAddr + vu_idx * P.VU.vu_sram_byte + \
             P.VU.vstart->read() * sizeof(elt_width ## _t)); \
           P.VU.elt<elt_width ## _t>(vd + i, pos, vu_idx, true) = val; \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
@@ -1835,7 +1858,7 @@ reg_t index[P.VU.vlmax]; \
       } \
       for (; i < len; ++i) { \
         for (reg_t pos = 0; pos < elt_per_reg; ++pos) { \
-          auto val = MMU.load_## elt_width(baseAddr + \
+          auto val = MMU.load_## elt_width(baseAddr + vu_idx * P.VU.vu_sram_byte + \
             P.VU.vstart->read() * sizeof(elt_width ## _t)); \
           P.VU.elt<elt_width ## _t>(vd + i, pos, vu_idx, true) = val; \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
@@ -1847,7 +1870,7 @@ reg_t index[P.VU.vlmax]; \
 
 #define VI_ST_WHOLE \
   require_vector_novtype(true, false); \
-  const reg_t baseAddr = RS1; \
+  reg_t baseAddr = RS1; \
   const reg_t vs3 = insn.rd(); \
   const reg_t len = insn.v_nf() + 1; \
   require_align(vs3, len); \
@@ -1855,6 +1878,12 @@ reg_t index[P.VU.vlmax]; \
   const reg_t n_vu = P.VU.get_vu_num(); \
   const reg_t vstart = P.VU.vstart->read(); \
   \
+  if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
+    reg_t prev = baseAddr; \
+    reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
+    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+  } \
   if (P.VU.vstart->read() < size) { \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       P.VU.vstart->write(vstart); \
@@ -1863,7 +1892,7 @@ reg_t index[P.VU.vlmax]; \
       if (off) { \
         for (reg_t pos = off; pos < P.VU.vlenb; ++pos) { \
           auto val = P.VU.elt<uint8_t>(vs3 + i, pos, vu_idx); \
-          MMU.store_uint8(baseAddr + P.VU.vstart->read(), val); \
+          MMU.store_uint8(baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read(), val); \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
         } \
         i++; \
@@ -1871,7 +1900,7 @@ reg_t index[P.VU.vlmax]; \
       for (; i < len; ++i) { \
         for (reg_t pos = 0; pos < P.VU.vlenb; ++pos) { \
           auto val = P.VU.elt<uint8_t>(vs3 + i, pos, vu_idx); \
-          MMU.store_uint8(baseAddr + P.VU.vstart->read(), val); \
+          MMU.store_uint8(baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read(), val); \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
         } \
       } \

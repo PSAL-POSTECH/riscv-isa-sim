@@ -279,7 +279,7 @@ public:
   processor_t(const char* isa, const char* priv, const char* varch,
               simif_t* sim, uint32_t id, bool halt_on_reset,
               FILE *log_file, std::ostream& sout_, uint32_t n_vu,
-              std::pair<reg_t, reg_t> vu_sram_space); // because of command line option --log and -s we need both
+              std::pair<reg_t, reg_t> vu_sram_space, std::pair<reg_t, reg_t> kernel_addr); // because of command line option --log and -s we need both
   ~processor_t();
 
   void set_debug(bool value);
@@ -456,6 +456,15 @@ public:
 
   const char* get_symbol(uint64_t addr);
 
+  bool get_kernel_flag() { return kernel_flag; }
+  void set_kernel_flag(bool flag) { kernel_flag = flag; }
+
+  reg_t get_kernel_sp() { return kernel_sp; }
+  void set_kernel_sp(reg_t sp) { kernel_sp = sp; }
+
+  reg_t get_kernel_sb() { return kernel_sb; }
+  void set_kernel_sb(reg_t sb) { kernel_sb = sb; }
+
 private:
   simif_t* sim;
   mmu_t* mmu; // main memory is always accessed via the mmu
@@ -482,6 +491,9 @@ private:
   insn_desc_t opcode_cache[OPCODE_CACHE_SIZE];
 
   uint32_t n_vu;
+  bool kernel_flag = false;
+  reg_t kernel_sp = 0;
+  reg_t kernel_sb = 0;
 
   void take_pending_interrupt() { take_interrupt(state.mip->read() & state.mie->read()); }
   void take_interrupt(reg_t mask); // take first enabled interrupt in mask
@@ -512,6 +524,8 @@ public:
   reg_t n_pmp;
   reg_t lg_pmp_granularity;
   reg_t pmp_tor_mask() { return -(reg_t(1) << (lg_pmp_granularity - PMP_SHIFT)); }
+
+  std::pair<reg_t, reg_t> kernel_addr;
 
   class vectorUnit_t {
     public:
