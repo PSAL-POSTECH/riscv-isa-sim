@@ -180,10 +180,12 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
       assert(fetch.insn.rvc_addi16sp_imm() < 0);
       p->set_kernel_sb(p->get_state()->XPR[2]);
       p->set_kernel_sp(p->get_state()->XPR[2] + fetch.insn.rvc_addi16sp_imm());
+      printf("Stack info > 0x%lx 0x%lx\n", p->get_kernel_sp(), p->get_kernel_sb());
+      printf("Stack size > 0x%lx\n", p->get_kernel_sb() - p->get_kernel_sp());
     }
     if (fetch.insn.rd() == 2)
-      sp_changed = true;  
-      
+      sp_changed = true;
+
   } else {
     p->set_kernel_flag(false);
     if (pc == p->kernel_addr.second){
@@ -230,9 +232,9 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
   }
   p->update_histogram(pc);
 
-  if (sp_changed) {
+  if (sp_changed)
     p->set_kernel_sp(p->get_state()->XPR[2]);
-  }
+
   return npc;
 }
 

@@ -1659,7 +1659,7 @@ reg_t index[P.VU.vlmax]; \
   if (P.get_kernel_flag() && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
-    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
   } \
   P.VU.vstart->write(vstart); \
@@ -1727,7 +1727,7 @@ reg_t index[P.VU.vlmax]; \
   if (P.get_kernel_flag() && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
-    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
   } \
   const reg_t n_vu = P.VU.get_vu_num(); \
@@ -1839,7 +1839,7 @@ reg_t index[P.VU.vlmax]; \
   if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
-    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
   } \
   if (P.VU.vstart->read() < size) { \
@@ -1881,7 +1881,7 @@ reg_t index[P.VU.vlmax]; \
   if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
-    reg_t stack_offset = P.get_kernel_sb() - P.get_kernel_sp(); \
+    reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
   } \
   if (P.VU.vstart->read() < size) { \

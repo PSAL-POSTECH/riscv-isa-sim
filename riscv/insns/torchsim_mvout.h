@@ -25,8 +25,6 @@ const reg_t n_elements_per_chunk = chunk_size / element_size;
 const bool lane_split_axis = n_elements_per_chunk < n_col ? COL : ROW;
 reg_t n_used_vlane  = 0;
 
-// printf("n_col: %d, n_row: %d, mm_stride: %d, element_size: %d, chunk_size: %d, is_col_major: %d, n_vu: %d\n", n_col, n_row, mm_stride, element_size, chunk_size, is_col_major, n_vu);
-
 if (lane_split_axis)
     n_used_vlane = n_col / n_elements_per_chunk;
 else
@@ -36,13 +34,14 @@ assert(n_used_vlane <= n_vu);
 
 const reg_t block_h = lane_split_axis ? n_row : n_row / n_used_vlane;
 const reg_t block_w = lane_split_axis ? n_col / n_used_vlane : n_col;
+const reg_t dram_vlane_offet = lane_split_axis ? chunk_size : mm_stride * block_h;
 const reg_t next_element_stride = is_col_major ? mm_stride : element_size;
 const reg_t next_line_stride = is_col_major ? element_size : mm_stride;
 const reg_t logical_block_h = is_col_major ? block_w : block_h;
 const reg_t logical_block_w = is_col_major ? block_h : block_w;
 
 for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
-    reg_t dram_base = dramAddr + lane_idx * chunk_size;
+    reg_t dram_base = dramAddr + lane_idx * dram_vlane_offet;
     reg_t sram_base = scratchpadAddr + lane_idx * P.VU.vu_sram_byte;
     if (lane_idx < n_used_vlane) {
         for (reg_t b_h=0; b_h<logical_block_h; b_h++) {
@@ -50,6 +49,7 @@ for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
             for (reg_t b_w=0; b_w<logical_block_w; b_w++) {
                 reg_t s_addr = sram_base + element_size * (b_h * logical_block_w + b_w);
                 reg_t d_addr = dram_base + dram_line_offset + next_element_stride * b_w;
+                // printf("STORE DRAM: 0x%lx, SRAM: 0x%lx > ", d_addr, s_addr);
                 if (element_size == 8){
                     uint64_t val = MMU.load_uint64(s_addr);
                     MMU.store_uint64(d_addr, val);
