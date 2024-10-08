@@ -177,9 +177,11 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
   if (pc >= p->kernel_addr.first && pc < p->kernel_addr.second) {
     p->set_kernel_flag(true);
     if (pc == p->kernel_addr.first) {
-      assert(fetch.insn.rvc_addi16sp_imm() < 0);
+      int64_t (insn_t::*imm)();
+      imm = fetch.insn.length() == 4 ? &insn_t::i_imm : &insn_t::rvc_addi16sp_imm;
+      assert((fetch.insn.*imm)() < 0);
       p->set_kernel_sb(p->get_state()->XPR[2]);
-      p->set_kernel_sp(p->get_state()->XPR[2] + fetch.insn.rvc_addi16sp_imm());
+      p->set_kernel_sp(p->get_state()->XPR[2] + (fetch.insn.*imm)());
       printf("Stack info > 0x%lx 0x%lx\n", p->get_kernel_sp(), p->get_kernel_sb());
       printf("Stack size > 0x%lx\n", p->get_kernel_sb() - p->get_kernel_sp());
     }
