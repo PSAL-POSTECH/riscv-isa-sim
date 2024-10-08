@@ -523,9 +523,8 @@ public:
 
   reg_t n_pmp;
   reg_t lg_pmp_granularity;
-  reg_t pmp_tor_mask() { return -(reg_t(1) << (lg_pmp_granularity - PMP_SHIFT)); }
-
   std::pair<reg_t, reg_t> kernel_addr;
+  reg_t pmp_tor_mask() { return -(reg_t(1) << (lg_pmp_granularity - PMP_SHIFT)); }
 
   class vectorUnit_t {
     public:
@@ -543,7 +542,7 @@ public:
       reg_t ELEN, VLEN;
       bool vill;
       bool vstart_alu;
-      uint32_t n_vu;
+      reg_t n_vu;
       std::pair<reg_t, reg_t> sram_space;
 
       reg_t in_mm_stride[4] = {0, 0, 0, 0};
@@ -629,7 +628,7 @@ public:
         return (VRM)(vxrm->read());
       }
 
-      uint32_t get_vu_num() {
+      reg_t get_vu_num() {
         return n_vu;
       }
   };

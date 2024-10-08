@@ -7,6 +7,9 @@
 #define ROW 0
 #define COL 1
 
+const char* debug_env = std::getenv("SPIKE_DEBUG");
+const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
+
 const reg_t dramAddr = RS1;
 const reg_t scratchpadAddr = (uint32_t)(RS2 & ((1ULL << 32) - 1));
 const reg_t n_col = (RS2 >> 32) & ((1 << 16) - 1);
@@ -15,7 +18,7 @@ const reg_t mm_stride = P.VU.out_mm_stride;
 const reg_t element_size = P.VU.out_element_size;
 const reg_t chunk_size = P.VU.out_chunk_size;
 const bool is_col_major = P.VU.out_is_col_major;
-const uint32_t n_vu = P.VU.get_vu_num();
+const reg_t n_vu = P.VU.get_vu_num();
 
 assert(mm_stride > 0);
 assert(element_size > 0);
@@ -39,6 +42,24 @@ const reg_t next_element_stride = is_col_major ? mm_stride : element_size;
 const reg_t next_line_stride = is_col_major ? element_size : mm_stride;
 const reg_t logical_block_h = is_col_major ? block_w : block_h;
 const reg_t logical_block_w = is_col_major ? block_h : block_w;
+
+if (debug_flag) {
+    printf("======== MVOUT =========\n");
+    printf("mvin: dramAddr: 0x%lx, scratchpadAddr: 0x%lx\n\
+n_col: %ld, n_row: %ld\n\
+mm_stride: %ld, element_size: %ld, chunk_size: %ld, is_col_major: %d\n\
+n_vu: %ld, n_used_vlane: %ld\n\
+block_h: %ld, block_w: %ld\n\
+dram_vlane_offet: %ld, next_element_stride: %ld, next_line_stride: %ld\n\
+logical_block_h: %ld, logical_block_w: %ld\n",
+    dramAddr, scratchpadAddr,
+    n_col, n_row,
+    mm_stride, element_size, chunk_size, is_col_major,
+    n_vu, n_used_vlane,
+    block_h, block_w,
+    dram_vlane_offet, next_element_stride, next_line_stride,
+    logical_block_h, logical_block_w);
+}
 
 for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
     reg_t dram_base = dramAddr + lane_idx * dram_vlane_offet;
