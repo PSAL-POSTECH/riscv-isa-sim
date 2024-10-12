@@ -119,7 +119,15 @@ riscv_insn_ext_i = \
 	fence \
 	fence_i \
 	torchsim_mvin \
+	torchsim_mvin2 \
+	torchsim_mvin3 \
 	torchsim_mvout \
+	torchsim_config \
+	torchsim_i_vpush \
+	torchsim_w_vpush \
+	torchsim_vpop \
+	torchsim_compute \
+	torchsim_vexp \
 
 riscv_insn_ext_a = \
 	amoadd_d \

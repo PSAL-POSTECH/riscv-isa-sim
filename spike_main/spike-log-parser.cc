@@ -27,7 +27,10 @@ int main(int argc, char** argv)
   parser.option(0, "isa", 1, [&](const char* s){isa = s;});
   parser.parse(argv);
 
-  processor_t p(isa, DEFAULT_PRIV, DEFAULT_VARCH, 0, 0, false, nullptr, cerr);
+  uint32_t n_vu = 1;
+  std::pair<reg_t, reg_t> vu_sram_space = std::make_pair(0, 0);
+  std::pair<reg_t, reg_t> kernel_addr = std::make_pair(0, 0);
+  processor_t p(isa, DEFAULT_PRIV, DEFAULT_VARCH, 0, 0, false, nullptr, cerr, n_vu, vu_sram_space, kernel_addr);
   if (extension) {
     p.register_extension(extension());
   }

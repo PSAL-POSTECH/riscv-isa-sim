@@ -8,6 +8,7 @@
 #include "abstract_device.h"
 #include <string>
 #include <vector>
+#include <queue>
 #include <unordered_map>
 #include <map>
 #include <cassert>
@@ -277,7 +278,8 @@ class processor_t : public abstract_device_t
 public:
   processor_t(const char* isa, const char* priv, const char* varch,
               simif_t* sim, uint32_t id, bool halt_on_reset,
-              FILE *log_file, std::ostream& sout_); // because of command line option --log and -s we need both
+              FILE *log_file, std::ostream& sout_, uint32_t n_vu,
+              std::pair<reg_t, reg_t> vu_sram_space, std::pair<reg_t, reg_t> kernel_addr); // because of command line option --log and -s we need both
   ~processor_t();
 
   void set_debug(bool value);
@@ -454,6 +456,15 @@ public:
 
   const char* get_symbol(uint64_t addr);
 
+  bool get_kernel_flag() { return kernel_flag; }
+  void set_kernel_flag(bool flag) { kernel_flag = flag; }
+
+  reg_t get_kernel_sp() { return kernel_sp; }
+  void set_kernel_sp(reg_t sp) { kernel_sp = sp; }
+
+  reg_t get_kernel_sb() { return kernel_sb; }
+  void set_kernel_sb(reg_t sb) { kernel_sb = sb; }
+
 private:
   simif_t* sim;
   mmu_t* mmu; // main memory is always accessed via the mmu
@@ -478,6 +489,11 @@ private:
 
   static const size_t OPCODE_CACHE_SIZE = 8191;
   insn_desc_t opcode_cache[OPCODE_CACHE_SIZE];
+
+  uint32_t n_vu;
+  bool kernel_flag = false;
+  reg_t kernel_sp = 0;
+  reg_t kernel_sb = 0;
 
   void take_pending_interrupt() { take_interrupt(state.mip->read() & state.mie->read()); }
   void take_interrupt(reg_t mask); // take first enabled interrupt in mask
@@ -507,12 +523,13 @@ public:
 
   reg_t n_pmp;
   reg_t lg_pmp_granularity;
+  std::pair<reg_t, reg_t> kernel_addr;
   reg_t pmp_tor_mask() { return -(reg_t(1) << (lg_pmp_granularity - PMP_SHIFT)); }
 
   class vectorUnit_t {
     public:
       processor_t* p;
-      void *reg_file;
+      void **reg_file;
       char reg_referenced[NVPR];
       int setvl_count;
       reg_t vlmax;
@@ -525,10 +542,25 @@ public:
       reg_t ELEN, VLEN;
       bool vill;
       bool vstart_alu;
+      reg_t n_vu;
+      std::pair<reg_t, reg_t> sram_space;
+
+      reg_t in_mm_stride[4] = {0, 0, 0, 0};
+      reg_t in_element_size[4] = {0, 0, 0, 0};
+      reg_t in_chunk_size[4] = {0, 0, 0, 0};
+      bool in_is_col_major[4] = {false, false, false, false};
+
+      reg_t out_mm_stride = 0;
+      reg_t out_element_size = 0;
+      reg_t out_chunk_size = 0;
+      bool out_is_col_major = false;
+
+      // VU SRAM
+      reg_t vu_sram_byte = 128 << 10;
 
       // vector element for varies SEW
       template<class T>
-        T& elt(reg_t vReg, reg_t n, bool is_write = false){
+        T& elt(reg_t vReg, reg_t n, reg_t vu_idx, bool is_write = false){
           assert(vsew != 0);
           assert((VLEN >> 3)/sizeof(T) > 0);
           reg_t elts_per_reg = (VLEN >> 3) / (sizeof(T));
@@ -545,8 +577,8 @@ public:
           if (is_write)
             p->get_state()->log_reg_write[((vReg) << 4) | 2] = {0, 0};
 #endif
-
-          T *regStart = (T*)((char*)reg_file + vReg * (VLEN >> 3));
+          // printf("int elt vu idx = %u, %lu\n", vu_idx, vReg * (VLEN >> 3));
+          T *regStart = (T*)((char*)reg_file[vu_idx] + vReg * (VLEN >> 3));
           return regStart[n];
         }
     public:
@@ -576,8 +608,14 @@ public:
       }
 
       ~vectorUnit_t(){
-        free(reg_file);
-        reg_file = 0;
+        if (reg_file) {
+          for (int vu_idx=0; vu_idx<static_cast<int>(n_vu); vu_idx++)
+            if (reg_file[vu_idx]) {
+              free(reg_file[vu_idx]);
+            }
+          free(reg_file);
+          reg_file = 0;
+        }
       }
 
       reg_t set_vl(int rd, int rs1, reg_t reqVL, reg_t newType);
@@ -589,9 +627,90 @@ public:
       VRM get_vround_mode() {
         return (VRM)(vxrm->read());
       }
+
+      reg_t get_vu_num() {
+        return n_vu;
+      }
+  };
+
+  class systolicArray_t {
+    public:
+      processor_t* p;
+      uint32_t sa_dim;
+      std::queue<float> **i_fifo;
+      std::queue<float> **w_fifo;
+      std::queue<float> **output;
+
+      int queue_max;
+
+    public:
+
+      void reset();
+
+      systolicArray_t():
+        p(0),
+        sa_dim(0),
+        i_fifo(0),
+        w_fifo(0),
+        output(0),
+        queue_max(32) {
+      }
+
+      ~systolicArray_t() {
+        if (i_fifo) {
+          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
+            delete i_fifo[dim_idx];
+          free(i_fifo);
+        }
+        if (w_fifo) {
+          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
+            delete w_fifo[dim_idx];
+          free(w_fifo);
+        }
+        if (output) {
+          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
+            delete output[dim_idx];
+          free(output);
+        }
+      }
+
+      void input_vpush(uint32_t dim_idx, float val) {
+        i_fifo[dim_idx]->push(val);
+      }
+
+      void weight_vpush(uint32_t dim_idx, float val) {
+        w_fifo[dim_idx]->push(val);
+      }
+
+      void output_push(uint32_t dim_idx, float val) {
+        output[dim_idx]->push(val);
+      }
+
+      float input_vpop(uint32_t dim_idx) {
+        float val = i_fifo[dim_idx]->front();
+        i_fifo[dim_idx]->pop();
+        return val;
+      }
+
+      float weight_vpop(uint32_t dim_idx) {
+        float val = w_fifo[dim_idx]->front();
+        w_fifo[dim_idx]->pop();
+        return val;
+      }
+
+      float output_pop(uint32_t dim_idx) {
+        float val = output[dim_idx]->front();
+        output[dim_idx]->pop();
+        return val;
+      }
+
+      uint32_t get_sa_dim() {
+        return sa_dim;
+      }
   };
 
   vectorUnit_t VU;
+  systolicArray_t SA;
 };
 
 reg_t illegal_instruction(processor_t* p, insn_t insn, reg_t pc);

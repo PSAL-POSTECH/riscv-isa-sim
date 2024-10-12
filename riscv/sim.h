@@ -42,7 +42,8 @@ public:
 #ifdef HAVE_BOOST_ASIO
         boost::asio::io_service *io_service_ptr_ctor, boost::asio::ip::tcp::acceptor *acceptor_ptr_ctor,  // option -s
 #endif
-        FILE *cmd_file); // needed for command line option --cmd
+        FILE *cmd_file, uint64_t scratchpad_base_paddr, uint64_t scratchpad_base_vaddr,
+        uint64_t scratchpad_size, uint32_t n_vu, std::pair<reg_t, reg_t> kernel_addr);
   ~sim_t();
 
   // run the simulation to completion
@@ -68,6 +69,9 @@ public:
 
   // Callback for processors to let the simulation know they were reset.
   void proc_reset(unsigned id);
+  uint64_t get_spad_paddr() { return scratchpad_base_paddr; }
+  uint64_t get_spad_vaddr() { return scratchpad_base_vaddr; }
+  uint64_t get_spad_size() { return scratchpad_size * n_vu; }
 
 private:
   std::vector<std::pair<reg_t, mem_t*>> mems;
@@ -88,6 +92,11 @@ private:
   log_file_t log_file;
 
   FILE *cmd_file; // pointer to debug command input file
+  uint64_t scratchpad_base_paddr;
+  uint64_t scratchpad_base_vaddr;
+  uint64_t scratchpad_size;
+  uint32_t n_vu;
+  std::pair<reg_t, reg_t> kernel_addr;
 
 #ifdef HAVE_BOOST_ASIO
   // the following are needed for command socket interface

@@ -40,7 +40,8 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
 #ifdef HAVE_BOOST_ASIO
              boost::asio::io_service *io_service_ptr, boost::asio::ip::tcp::acceptor *acceptor_ptr, // option -s
 #endif
-             FILE *cmd_file) // needed for command line option --cmd
+             FILE *cmd_file, uint64_t scratchpad_base_paddr, uint64_t scratchpad_base_vaddr,
+             uint64_t scratchpad_size, uint32_t n_vu, std::pair<reg_t, reg_t> kernel_addr)// needed for command line option --cmd
   : htif_t(args),
     mems(mems),
     plugin_devices(plugin_devices),
@@ -53,6 +54,11 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
     dtb_enabled(dtb_enabled),
     log_file(log_path),
     cmd_file(cmd_file),
+    scratchpad_base_paddr(scratchpad_base_paddr),
+    scratchpad_base_vaddr(scratchpad_base_vaddr),
+    scratchpad_size(scratchpad_size),
+    n_vu(n_vu),
+    kernel_addr(kernel_addr),
 #ifdef HAVE_BOOST_ASIO
     io_service_ptr(io_service_ptr), // socket interface
     acceptor_ptr(acceptor_ptr),
@@ -88,10 +94,11 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
       exit(1);
   }
 
+  std::pair<reg_t, reg_t> vu_sram_space = std::make_pair(scratchpad_base_paddr, scratchpad_base_paddr+scratchpad_size);
   for (size_t i = 0; i < nprocs; i++) {
     int hart_id = hartids.empty() ? i : hartids[i];
     procs[i] = new processor_t(isa, priv, varch, this, hart_id, halted,
-                               log_file.get(), sout_);
+                               log_file.get(), sout_, n_vu, vu_sram_space, kernel_addr);
   }
 
   make_dtb();

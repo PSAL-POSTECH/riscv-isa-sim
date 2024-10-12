@@ -172,6 +172,30 @@ inline void processor_t::update_histogram(reg_t pc)
 // function calls.
 static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
 {
+  bool prev_kernel_flag = p->get_kernel_flag();
+  bool sp_changed = false;
+  if (pc >= p->kernel_addr.first && pc < p->kernel_addr.second) {
+    p->set_kernel_flag(true);
+    if (pc == p->kernel_addr.first) {
+      int64_t (insn_t::*imm)();
+      imm = fetch.insn.length() == 4 ? &insn_t::i_imm : &insn_t::rvc_addi16sp_imm;
+      assert((fetch.insn.*imm)() < 0);
+      p->set_kernel_sb(p->get_state()->XPR[2]);
+      p->set_kernel_sp(p->get_state()->XPR[2] + (fetch.insn.*imm)());
+      printf("Stack info > 0x%lx 0x%lx\n", p->get_kernel_sp(), p->get_kernel_sb());
+      printf("Stack size > 0x%lx\n", p->get_kernel_sb() - p->get_kernel_sp());
+    }
+    if (fetch.insn.rd() == 2)
+      sp_changed = true;
+
+  } else {
+    p->set_kernel_flag(false);
+    if (pc == p->kernel_addr.second){
+      p->set_kernel_sp(0);
+      p->set_kernel_sb(0);
+    }
+  }
+
   commit_log_reset(p);
   commit_log_stash_privilege(p);
   reg_t npc;
@@ -209,6 +233,9 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
     throw;
   }
   p->update_histogram(pc);
+
+  if (sp_changed)
+    p->set_kernel_sp(p->get_state()->XPR[2]);
 
   return npc;
 }

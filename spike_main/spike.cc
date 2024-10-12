@@ -71,8 +71,9 @@ static void help(int exit_code = 1)
   fprintf(stderr, "  --dm-no-hasel         Debug module supports hasel\n");
   fprintf(stderr, "  --dm-no-abstract-csr  Debug module won't support abstract to authenticate\n");
   fprintf(stderr, "  --dm-no-halt-groups   Debug module won't support halt groups\n");
-  fprintf(stderr, "  --dm-no-impebreak     Debug module won't support implicit ebreak in program buffer\n");
-
+  fprintf(stderr, "  --scratchpad-base-paddr=<addr> Scratchpad base physical address\n");
+  fprintf(stderr, "  --scratchpad-base-vaddr=<addr> Scratchpad base virtual address\n");
+  fprintf(stderr, "  --scratchpad-size=<size>       Scratchpad size\n");
   exit(exit_code);
 }
 
@@ -207,6 +208,22 @@ static unsigned long atoul_nonzero_safe(const char* s)
   return res;
 }
 
+static std::pair<reg_t, reg_t> make_kernel_space_info(const char * s) {
+  std::pair<reg_t, reg_t> kernel_addr;
+  std::string str(s);
+  std::string start, end;
+  size_t pos = str.find(':');
+  if (pos != std::string::npos) {
+    start = str.substr(0, pos);
+    end = str.substr(pos + 1);
+    kernel_addr.first = std::stoull(start, nullptr, 16);
+    kernel_addr.second = std::stoull(end, nullptr, 16);
+  }
+  else
+    assert(0);
+  return kernel_addr;
+}
+
 int main(int argc, char** argv)
 {
   bool debug = false;
@@ -252,6 +269,11 @@ int main(int argc, char** argv)
     .support_impebreak = true
   };
   std::vector<int> hartids;
+  uint64_t scratchpad_base_paddr = 0xC0000000;
+  uint64_t scratchpad_base_vaddr = 0x0A000000;
+  uint64_t scratchpad_size = 128 << 10; // 128 KB
+  uint32_t vectorlane_size = 4;
+  std::pair<reg_t, reg_t> kernel_addr;
 
   auto const hartids_parser = [&](const char *s) {
     std::string const str(s);
@@ -376,11 +398,34 @@ int main(int argc, char** argv)
         exit(-1);
      }
   });
-
+  parser.option(0, "scratchpad-base-paddr", 1,
+      [&](const char* s){scratchpad_base_paddr = atoul_safe(s);});
+  parser.option(0, "scratchpad-base-vaddr", 1,
+      [&](const char* s){scratchpad_base_vaddr = atoul_safe(s);});
+  parser.option(0, "scratchpad-size", 1,
+      [&](const char* s){scratchpad_size = atoul_safe(s);});
+  parser.option(0, "vectorlane-size", 1,
+      [&](const char* s){vectorlane_size = atoul_safe(s);});
+  parser.option(0, "kernel-addr", 1,
+       [&](const char* s){kernel_addr = make_kernel_space_info(s);});
   auto argv1 = parser.parse(argv);
   std::vector<std::string> htif_args(argv1, (const char*const*)argv + argc);
-  if (mems.empty())
-    mems = make_mems("2048");
+  if (mems.empty()) {
+    reg_t main_mem_byte = 1<<30; // 1 GB
+    reg_t base_addr = 0x80000000;
+    char mem_opt[100];
+    sprintf(mem_opt, "0x%lx:0x%lx,0x%lx:0x%lx", base_addr, main_mem_byte, scratchpad_base_paddr,
+      scratchpad_size*vectorlane_size);
+    printf("mem opt > %s\n", mem_opt);
+    mems = make_mems(mem_opt);
+  }
+  printf("Number of vectorlane: %d\n", vectorlane_size);
+  printf("Scratchpad base physical address: 0x%lx\n", scratchpad_base_paddr);
+  printf("Scratchpad base virtual address: 0x%lx\n", scratchpad_base_vaddr);
+  printf("Kernel addr: 0x%lx, 0x%lx\n", kernel_addr.first, kernel_addr.second);
+  for (auto& m : mems) {
+    printf("MEM >> Base Addr: %lx, Size: %lx\n", m.first, m.second->size());
+  }
 
   if (!*argv1)
     help();
@@ -440,7 +485,7 @@ int main(int argc, char** argv)
 #ifdef HAVE_BOOST_ASIO
       io_service_ptr, acceptor_ptr,
 #endif
-      cmd_file);
+      cmd_file, scratchpad_base_paddr, scratchpad_base_vaddr, scratchpad_size, vectorlane_size, kernel_addr);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));

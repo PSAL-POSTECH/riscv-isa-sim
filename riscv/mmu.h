@@ -96,8 +96,16 @@ public:
 #endif
 
   // template for functions that load an aligned value from memory
+  // Todo: Need to make VU SRAM address space configurable
   #define load_func(type, prefix, xlate_flags) \
     inline type##_t prefix##_##type(reg_t addr, bool require_alignment = false) { \
+      if (addr >= sim->get_spad_vaddr() && addr < sim->get_spad_vaddr() + sim->get_spad_size()) { \
+        reg_t offset = addr - sim->get_spad_vaddr(); \
+        reg_t pa = offset + sim->get_spad_paddr(); \
+        auto host_addr = sim->addr_to_mem(pa); \
+        type##_t data = from_target(*(target_endian<type##_t>*)host_addr); \
+        return data; \
+      } \
       if (unlikely(addr & (sizeof(type##_t)-1))) { \
         if (require_alignment) load_reserved_address_misaligned(addr); \
         else return misaligned_load(addr, sizeof(type##_t), xlate_flags); \
@@ -158,8 +166,21 @@ public:
 #endif
 
   // template for functions that store an aligned value to memory
+  // Todo: Need to make VU SRAM address space configurable
   #define store_func(type, prefix, xlate_flags) \
     void prefix##_##type(reg_t addr, type##_t val) { \
+      if (addr >= sim->get_spad_vaddr() && addr < sim->get_spad_vaddr() + sim->get_spad_size()) { \
+        reg_t offset = addr - sim->get_spad_vaddr(); \
+        reg_t pa = offset + sim->get_spad_paddr(); \
+        target_endian<type##_t> target_val = to_target(val); \
+        if (auto host_addr = sim->addr_to_mem(pa)) { \
+          memcpy(host_addr, (uint8_t *)&target_val, sizeof(target_val)); \
+          return; \
+        } else { \
+          mmio_store(pa, sizeof(target_val), (uint8_t *)&target_val); \
+          return; \
+        } \
+      } \
       if (unlikely(addr & (sizeof(type##_t)-1))) \
         return misaligned_store(addr, val, sizeof(type##_t), xlate_flags); \
       reg_t vpn = addr >> PGSHIFT; \
@@ -388,6 +409,9 @@ public:
   {
     return target_big_endian? target_endian<T>::to_be(n) : target_endian<T>::to_le(n);
   }
+
+  reg_t get_spad_base_vaddr() { return sim->get_spad_vaddr(); }
+  reg_t get_spad_base_paddr() { return sim->get_spad_paddr(); }
 
 private:
   simif_t* sim;
