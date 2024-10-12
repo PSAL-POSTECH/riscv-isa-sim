@@ -1,8 +1,21 @@
 const uint32_t sa_dim = P.SA.get_sa_dim();
 
-float m_a[sa_dim][sa_dim];
-float m_b[sa_dim][sa_dim];
-float out[sa_dim][sa_dim];
+static float** m_a = nullptr;
+static float** m_b = nullptr;
+static float** out = nullptr;
+
+// Allocate memory only if it's not already allocated
+if (m_a == nullptr) {
+    m_a = new float*[sa_dim];
+    m_b = new float*[sa_dim];
+    out = new float*[sa_dim];
+
+    for (size_t i = 0; i < sa_dim; ++i) {
+        m_a[i] = new float[sa_dim];
+        m_b[i] = new float[sa_dim];
+        out[i] = new float[sa_dim];
+    }
+}
 
 // pop from input, weight serializers
 for (reg_t depth=0; depth<sa_dim; depth++) {

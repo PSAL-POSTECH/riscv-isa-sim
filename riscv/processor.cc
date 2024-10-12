@@ -636,22 +636,21 @@ void processor_t::systolicArray_t::reset() {
   if (i_fifo) {
     for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
       delete i_fifo[dim_idx];
-    free(i_fifo);
+    delete[] i_fifo;
   }
   if (w_fifo) {
     for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
       delete w_fifo[dim_idx];
-    free(w_fifo);
+    delete[] w_fifo;
   }
   if (output) {
     for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
       delete output[dim_idx];
-    free(output);
+    delete[] output;
   }
-
-  i_fifo = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
-  w_fifo = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
-  output = (std::queue<float>**)malloc(sa_dim * sizeof(std::queue<float> *));
+  i_fifo = new std::queue<float>*[sa_dim];
+  w_fifo = new std::queue<float>*[sa_dim];
+  output = new std::queue<float>*[sa_dim];
 
   for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
     i_fifo[dim_idx] = new std::queue<float>();
