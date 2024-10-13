@@ -274,6 +274,8 @@ int main(int argc, char** argv)
   uint64_t scratchpad_size = 128 << 10; // 128 KB
   uint32_t vectorlane_size = 4;
   std::pair<reg_t, reg_t> kernel_addr;
+  const char* debug_env = std::getenv("SPIKE_DEBUG");
+  const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
 
   auto const hartids_parser = [&](const char *s) {
     std::string const str(s);
@@ -416,15 +418,18 @@ int main(int argc, char** argv)
     char mem_opt[100];
     sprintf(mem_opt, "0x%lx:0x%lx,0x%lx:0x%lx", base_addr, main_mem_byte, scratchpad_base_paddr,
       scratchpad_size*vectorlane_size);
-    printf("mem opt > %s\n", mem_opt);
+    if (debug_flag)
+      printf("mem opt > %s\n", mem_opt);
     mems = make_mems(mem_opt);
   }
-  printf("Number of vectorlane: %d\n", vectorlane_size);
-  printf("Scratchpad base physical address: 0x%lx\n", scratchpad_base_paddr);
-  printf("Scratchpad base virtual address: 0x%lx\n", scratchpad_base_vaddr);
-  printf("Kernel addr: 0x%lx, 0x%lx\n", kernel_addr.first, kernel_addr.second);
-  for (auto& m : mems) {
-    printf("MEM >> Base Addr: %lx, Size: %lx\n", m.first, m.second->size());
+  if (debug_flag) {
+    printf("Number of vectorlane: %d\n", vectorlane_size);
+    printf("Scratchpad base physical address: 0x%lx\n", scratchpad_base_paddr);
+    printf("Scratchpad base virtual address: 0x%lx\n", scratchpad_base_vaddr);
+    printf("Kernel addr: 0x%lx, 0x%lx\n", kernel_addr.first, kernel_addr.second);
+    for (auto& m : mems) {
+      printf("MEM >> Base Addr: %lx, Size: %lx\n", m.first, m.second->size());
+    }
   }
 
   if (!*argv1)

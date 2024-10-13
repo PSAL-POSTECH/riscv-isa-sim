@@ -182,8 +182,6 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
       assert((fetch.insn.*imm)() < 0);
       p->set_kernel_sb(p->get_state()->XPR[2]);
       p->set_kernel_sp(p->get_state()->XPR[2] + (fetch.insn.*imm)());
-      printf("Stack info > 0x%lx 0x%lx\n", p->get_kernel_sp(), p->get_kernel_sb());
-      printf("Stack size > 0x%lx\n", p->get_kernel_sb() - p->get_kernel_sp());
     }
     if (fetch.insn.rd() == 2)
       sp_changed = true;
