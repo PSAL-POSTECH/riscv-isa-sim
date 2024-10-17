@@ -613,7 +613,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rd_num = insn.rd(); \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
 
@@ -664,7 +664,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rd_num = insn.rd(); \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       VI_LOOP_ELEMENT_SKIP(); \
@@ -682,7 +682,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   require(P.VU.vsew <= e64); \
   require_vector(true);\
   reg_t vl = P.VU.vl->read();                        \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t i = P.VU.vstart->read(); i < vl; ++i) { \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       int midx = i / 64; \
@@ -1062,7 +1062,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rd_num = insn.rd(); \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     auto &vd_0_des = P.VU.elt<type_sew_t<x>::type>(rd_num, 0, vu_idx, true); \
     auto vd_0_res = P.VU.elt<type_sew_t<x>::type>(rs1_num, 0, vu_idx); \
@@ -1095,7 +1095,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rd_num = insn.rd(); \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     auto &vd_0_des = P.VU.elt<type_usew_t<x>::type>(rd_num, 0, vu_idx, true); \
     auto vd_0_res = P.VU.elt<type_usew_t<x>::type>(rs1_num, 0, vu_idx); \
@@ -1460,7 +1460,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rd_num = insn.rd(); \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     auto &vd_0_des = P.VU.elt<type_sew_t<sew2>::type>(rd_num, 0, vu_idx, true); \
     auto vd_0_res = P.VU.elt<type_sew_t<sew2>::type>(rs1_num, 0, vu_idx); \
@@ -1490,7 +1490,7 @@ static inline bool is_aligned(const unsigned val, const unsigned pos)
   reg_t rd_num = insn.rd(); \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     auto &vd_0_des = P.VU.elt<type_usew_t<sew2>::type>(rd_num, 0, vu_idx, true); \
     auto vd_0_res = P.VU.elt<type_usew_t<sew2>::type>(rs1_num, 0, vu_idx); \
@@ -1654,7 +1654,7 @@ reg_t index[P.VU.vlmax]; \
   const reg_t vd = insn.rd(); \
   reg_t addr = 0; \
   VI_CHECK_LOAD(elt_width, is_mask_ldst); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   const reg_t vstart = P.VU.vstart->read(); \
   if (P.get_kernel_flag() && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
@@ -1682,7 +1682,7 @@ reg_t index[P.VU.vlmax]; \
   const reg_t vl = P.VU.vl->read(); \
   const reg_t baseAddr = RS1; \
   const reg_t vd = insn.rd(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   if (!is_seg) \
     require(nf == 1); \
   VI_CHECK_LD_INDEX(elt_width); \
@@ -1730,7 +1730,7 @@ reg_t index[P.VU.vlmax]; \
     reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
   } \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     for (reg_t i = 0; i < vl; ++i) { \
       VI_STRIP(i) \
@@ -1751,7 +1751,7 @@ reg_t index[P.VU.vlmax]; \
   const reg_t vl = P.VU.vl->read(); \
   const reg_t baseAddr = RS1; \
   const reg_t vs3 = insn.rd(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   if (!is_seg) \
     require(nf == 1); \
   VI_CHECK_ST_INDEX(elt_width); \
@@ -1793,7 +1793,7 @@ reg_t index[P.VU.vlmax]; \
   const reg_t vl = p->VU.vl->read(); \
   const reg_t baseAddr = RS1; \
   const reg_t rd_num = insn.rd(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   VI_CHECK_LOAD(elt_width, false); \
   bool early_stop = false; \
   if (P.get_kernel_flag()) \
@@ -1834,7 +1834,7 @@ reg_t index[P.VU.vlmax]; \
   require_align(vd, len); \
   const reg_t elt_per_reg = P.VU.vlenb / sizeof(elt_width ## _t); \
   const reg_t size = len * elt_per_reg; \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   const reg_t vstart = P.VU.vstart->read(); \
   if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
@@ -1875,7 +1875,7 @@ reg_t index[P.VU.vlmax]; \
   const reg_t len = insn.v_nf() + 1; \
   require_align(vs3, len); \
   const reg_t size = len * P.VU.vlenb; \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   const reg_t vstart = P.VU.vstart->read(); \
   \
   if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
@@ -1932,13 +1932,12 @@ reg_t index[P.VU.vlmax]; \
       } \
     } \
   } \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     VI_DUPLICATE_VREG(insn.rs2(), idx_type); \
     const reg_t vl = P.VU.vl->read(); \
     const reg_t baseAddr = RS1; \
     const reg_t vd = insn.rd(); \
-    const reg_t n_vu = P.VU.get_vu_num(); \
     for (reg_t i = P.VU.vstart->read(); i < vl; ++i) { \
       VI_ELEMENT_SKIP(i); \
       VI_STRIP(i); \
@@ -2028,14 +2027,14 @@ reg_t index[P.VU.vlmax]; \
 
 #define VI_VFP_LOOP_BASE \
   VI_VFP_COMMON \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       VI_LOOP_ELEMENT_SKIP();
 
 #define VI_VFP_LOOP_CMP_BASE \
   VI_VFP_COMMON \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t i = P.VU.vstart->read(); i < vl; ++i) { \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       VI_LOOP_ELEMENT_SKIP(); \
@@ -2044,7 +2043,7 @@ reg_t index[P.VU.vlmax]; \
       uint64_t res = 0;
 
 #define VI_VFP_LOOP_REDUCTION_BASE(width) \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     float##width##_t vd_0 = P.VU.elt<float##width##_t>(rd_num, 0, vu_idx); \
     float##width##_t vs1_0 = P.VU.elt<float##width##_t>(rs1_num, 0, vu_idx); \
@@ -2057,7 +2056,7 @@ reg_t index[P.VU.vlmax]; \
 
 #define VI_VFP_LOOP_WIDE_REDUCTION_BASE \
   VI_VFP_COMMON \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     float64_t vd_0 = f64(P.VU.elt<float64_t>(rs1_num, 0, vu_idx).v); \
     for (reg_t i=P.VU.vstart->read(); i<vl; ++i) { \
@@ -2229,7 +2228,7 @@ reg_t index[P.VU.vlmax]; \
   require((P.VU.vsew == e16 && p->extension_enabled('F')) || \
           (P.VU.vsew == e32 && p->extension_enabled('D'))); \
   bool is_active = false; \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     switch(P.VU.vsew) { \
       case e16: {\
@@ -2464,7 +2463,7 @@ reg_t index[P.VU.vlmax]; \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
   softfloat_roundingMode = STATE.frm->read(); \
-  const reg_t n_vu = P.VU.get_vu_num(); \
+  const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       VI_LOOP_ELEMENT_SKIP();

@@ -428,7 +428,7 @@ int main(int argc, char** argv)
     printf("Scratchpad base virtual address: 0x%lx\n", scratchpad_base_vaddr);
     printf("Kernel addr: 0x%lx, 0x%lx\n", kernel_addr.first, kernel_addr.second);
     for (auto& m : mems) {
-      printf("MEM >> Base Addr: %lx, Size: %lx\n", m.first, m.second->size());
+      printf("MEM >> Base Addr: 0x%lx:0x%lx, Size: 0x%lx\n", m.first, m.first + m.second->size()-1, m.second->size());
     }
   }
 
