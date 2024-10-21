@@ -15,6 +15,7 @@
 #include "debug_rom_defines.h"
 #include "entropy_source.h"
 #include "csrs.h"
+#include "systolic_array.h"
 
 class processor_t;
 class mmu_t;
@@ -23,6 +24,7 @@ class simif_t;
 class trap_t;
 class extension_t;
 class disassembler_t;
+class systolicArray_t;
 
 struct insn_desc_t
 {
@@ -633,84 +635,8 @@ public:
       }
   };
 
-  class systolicArray_t {
-    public:
-      processor_t* p;
-      uint32_t sa_dim;
-      std::queue<float> **i_fifo;
-      std::queue<float> **w_fifo;
-      std::queue<float> **output;
-
-      int queue_max;
-
-    public:
-
-      void reset();
-
-      systolicArray_t():
-        p(0),
-        sa_dim(0),
-        i_fifo(0),
-        w_fifo(0),
-        output(0),
-        queue_max(32) {
-      }
-
-      ~systolicArray_t() {
-        if (i_fifo) {
-          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-            delete i_fifo[dim_idx];
-          free(i_fifo);
-        }
-        if (w_fifo) {
-          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-            delete w_fifo[dim_idx];
-          free(w_fifo);
-        }
-        if (output) {
-          for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-            delete output[dim_idx];
-          free(output);
-        }
-      }
-
-      void input_vpush(uint32_t dim_idx, float val) {
-        i_fifo[dim_idx]->push(val);
-      }
-
-      void weight_vpush(uint32_t dim_idx, float val) {
-        w_fifo[dim_idx]->push(val);
-      }
-
-      void output_push(uint32_t dim_idx, float val) {
-        output[dim_idx]->push(val);
-      }
-
-      float input_vpop(uint32_t dim_idx) {
-        float val = i_fifo[dim_idx]->front();
-        i_fifo[dim_idx]->pop();
-        return val;
-      }
-
-      float weight_vpop(uint32_t dim_idx) {
-        float val = w_fifo[dim_idx]->front();
-        w_fifo[dim_idx]->pop();
-        return val;
-      }
-
-      float output_pop(uint32_t dim_idx) {
-        float val = output[dim_idx]->front();
-        output[dim_idx]->pop();
-        return val;
-      }
-
-      uint32_t get_sa_dim() {
-        return sa_dim;
-      }
-  };
-
   vectorUnit_t VU;
-  systolicArray_t SA;
+  systolicArray_t *SA;
 };
 
 reg_t illegal_instruction(processor_t* p, insn_t insn, reg_t pc);

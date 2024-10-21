@@ -35,7 +35,7 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
   VU.p = this;
   VU.n_vu = n_vu;
   VU.sram_space = vu_sram_space;
-  SA.sa_dim = n_vu;
+  SA = new systolicArray_t(this, n_vu);
 
   parse_isa_string(isa);
   parse_priv_string(priv);
@@ -70,7 +70,8 @@ processor_t::~processor_t()
       fprintf(stderr, "%0" PRIx64 " %" PRIu64 "\n", it.first, it.second);
   }
 #endif
-
+  
+  delete SA;
   delete mmu;
   delete disassembler;
 }
@@ -632,34 +633,6 @@ reg_t processor_t::vectorUnit_t::set_vl(int rd, int rs1, reg_t reqVL, reg_t newT
   return vl->read();
 }
 
-void processor_t::systolicArray_t::reset() {
-  if (i_fifo) {
-    for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-      delete i_fifo[dim_idx];
-    delete[] i_fifo;
-  }
-  if (w_fifo) {
-    for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-      delete w_fifo[dim_idx];
-    delete[] w_fifo;
-  }
-  if (output) {
-    for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-      delete output[dim_idx];
-    delete[] output;
-  }
-  i_fifo = new std::queue<float>*[sa_dim];
-  w_fifo = new std::queue<float>*[sa_dim];
-  output = new std::queue<float>*[sa_dim];
-
-  for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-    i_fifo[dim_idx] = new std::queue<float>();
-  for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-    w_fifo[dim_idx] = new std::queue<float>();
-  for (int dim_idx=0; dim_idx<static_cast<int>(sa_dim); dim_idx++)
-    output[dim_idx] = new std::queue<float>();
-}
-
 void processor_t::set_debug(bool value)
 {
   debug = value;
@@ -694,7 +667,7 @@ void processor_t::reset()
   state.dcsr->halt = halt_on_reset;
   halt_on_reset = false;
   VU.reset();
-  SA.reset();
+  SA->reset();
 
   if (n_pmp > 0) {
     // For backwards compatibility with software that is unaware of PMP,

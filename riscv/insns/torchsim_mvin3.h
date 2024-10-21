@@ -48,7 +48,7 @@ const reg_t logical_block_h = is_col_major ? block_w : block_h;
 const reg_t logical_block_w = is_col_major ? block_h : block_w;
 
 if (debug_flag) {
-    printf("======== MVIN =========\n");
+    printf("======== MVIN3 =========\n");
     printf("mvin: dramAddr: 0x%lx, scratchpadAddr: 0x%lx\n\
 n_col: %ld, n_row: %ld\n\
 mm_stride: %ld, element_size: %ld, chunk_size: %ld, is_col_major: %d\n\

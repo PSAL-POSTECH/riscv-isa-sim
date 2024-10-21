@@ -14,7 +14,7 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
         VI_STRIP(i);
         P.VU.vstart->write(i);
         float val = P.VU.elt<float>(vs, vreg_inx, vu_idx, true);
-        P.SA.weight_vpush(vu_idx, val);
+        P.SA->w_serializer_vpush(vu_idx, val);
         if (debug_flag) {
             printf("%f ", val);
         }
@@ -24,3 +24,5 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
     }
 }
 P.VU.vstart->write(0);
+P.SA->n_weight += vl;
+P.SA->prefill_weight();
