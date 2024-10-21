@@ -29,12 +29,13 @@ assert(chunk_size > 0);
 const reg_t n_elements_per_chunk = chunk_size / element_size;
 const bool lane_split_axis = n_elements_per_chunk < n_col ? COL : ROW;
 reg_t n_used_vlane  = 0;
-
+reg_t n_used_vlane_per_subtile = 0;
 
 if (lane_split_axis)
-    n_used_vlane = MIN(n_col / n_elements_per_chunk, n_vu);
+    n_used_vlane = n_col / n_elements_per_chunk;
 else
-    n_used_vlane = MIN(n_row / (n_elements_per_chunk / n_col), n_vu);
+    n_used_vlane = n_row / (n_elements_per_chunk / n_col);
+const reg_t nr_blocks = MAX(n_used_vlane / n_vu, 1);
 
 const reg_t block_h = lane_split_axis ? n_row : n_row / n_used_vlane;
 const reg_t block_w = lane_split_axis ? n_col / n_used_vlane : n_col;
@@ -43,8 +44,6 @@ const reg_t next_element_stride = is_col_major ? mm_stride : element_size;
 const reg_t next_line_stride = is_col_major ? element_size : mm_stride;
 const reg_t logical_block_h = is_col_major ? block_w : block_h;
 const reg_t logical_block_w = is_col_major ? block_h : block_w;
-const reg_t nr_block_h = lane_split_axis ? 1 : MAX(1, n_row / n_vu);
-const reg_t nr_block_w = lane_split_axis ? MAX(n_col / n_vu, 1) : 1;
 
 if (debug_flag) {
     printf("======== MVOUT =========\n");
@@ -55,7 +54,7 @@ n_vu: %ld, n_used_vlane: %ld\n\
 block_h: %ld, block_w: %ld\n\
 dram_vlane_offet: %ld, next_element_stride: %ld, next_line_stride: %ld\n\
 logical_block_h: %ld, logical_block_w: %ld\n\
-nr_block_h: %ld, nr_block_w: %ld\n",
+nr_blocks\n",
     dramAddr, scratchpadAddr,
     n_col, n_row,
     mm_stride, element_size, chunk_size, is_col_major,
@@ -63,7 +62,7 @@ nr_block_h: %ld, nr_block_w: %ld\n",
     block_h, block_w,
     dram_vlane_offet, next_element_stride, next_line_stride,
     logical_block_h, logical_block_w,
-    nr_block_h, nr_block_w);
+    nr_blocks);
 }
 
 assert(n_used_vlane % n_vu == 0);
@@ -77,7 +76,7 @@ for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
         if (debug_flag) {
             printf("=========[%ld]========\n", lane_idx);
         }
-        for (reg_t b_idx=0; b_idx<nr_block_w*nr_block_h; b_idx++) {
+        for (reg_t b_idx=0; b_idx<nr_blocks; b_idx++) {
             if (debug_flag) {
                 printf("block_idx [%ld]\n", b_idx);
             }
