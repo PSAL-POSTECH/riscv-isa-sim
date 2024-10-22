@@ -46,7 +46,8 @@ const reg_t next_element_stride = is_col_major ? mm_stride : element_size;
 const reg_t next_line_stride = is_col_major ? element_size : mm_stride;
 const reg_t logical_block_h = is_col_major ? block_w : block_h;
 const reg_t logical_block_w = is_col_major ? block_h : block_w;
-
+const reg_t dram_block_offset = lane_split_axis ? n_vu * chunk_size : block_h * block_w * element_size;
+const reg_t sram_block_offset = lane_split_axis ? n_row * element_size : chunk_size * n_vu;
 if (debug_flag) {
     printf("======== MVIN2 =========\n");
     printf("mvin: dramAddr: 0x%lx, scratchpadAddr: 0x%lx\n\
@@ -56,7 +57,7 @@ n_vu: %ld, n_used_vlane: %ld\n\
 block_h: %ld, block_w: %ld\n\
 dram_vlane_offet: %ld, next_element_stride: %ld, next_line_stride: %ld\n\
 logical_block_h: %ld, logical_block_w: %ld\n\
-nr_blocks\n",
+nr_blocks %ld: dram_block_offset: %ld, sram_block_offset: %ld\n",
     dramAddr, scratchpadAddr,
     n_col, n_row,
     mm_stride, element_size, chunk_size, is_col_major,
@@ -64,7 +65,7 @@ nr_blocks\n",
     block_h, block_w,
     dram_vlane_offet, next_element_stride, next_line_stride,
     logical_block_h, logical_block_w,
-    nr_blocks);
+    nr_blocks, dram_block_offset, sram_block_offset);
 }
 
 assert(n_used_vlane % n_vu == 0);
@@ -72,8 +73,6 @@ assert(n_used_vlane % n_vu == 0);
 for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
     reg_t dram_base = dramAddr + lane_idx * dram_vlane_offet;
     reg_t sram_base = scratchpadAddr + lane_idx * P.VU.vu_sram_byte;
-    reg_t dram_block_offset = lane_split_axis ? chunk_size * element_size : block_h * block_w * element_size;
-    reg_t sram_block_offset = lane_split_axis ? n_row * element_size : chunk_size * element_size;
     if (lane_idx < n_used_vlane) {
         if (debug_flag) {
             printf("=========[%ld]========\n", lane_idx);
