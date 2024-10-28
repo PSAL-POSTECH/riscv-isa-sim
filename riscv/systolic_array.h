@@ -18,14 +18,28 @@ public:
   std::queue<float> **deserializer;
 
   float **input;
-  // float **weight;
   float **output;
-  // std::queue<float> **weight;
   std::vector<std::deque<float> *> *weight;
 
   reg_t n_input;
   reg_t n_weight;
   reg_t n_output;
+
+  reg_t total_input_pushed;
+
+
+  // Sparse Accelerator
+  // d = Dense matrix multiplication cyclic time
+  // nz = Non-zero elements in input matrix (0~1)
+  // alpha = Amount of decrease in cycle time by zero elements
+  // Cycle = d x (1 - alpha x (1 - nz))
+  reg_t d;
+  reg_t nz;
+  float alpha = 0.5;
+  reg_t n_weight_push;
+
+  uint32_t outerloop_count;
+  std::vector<reg_t> *compute_cycle;
 
 public:
   void reset();
@@ -37,10 +51,18 @@ public:
                                                 i_serializer(0),
                                                 w_serializer(0),
                                                 deserializer(0),
+                                                input(0),
+                                                output(0),
+                                                weight(0),
                                                 n_input(0),
                                                 n_weight(0),
-                                                n_output(0)
+                                                n_output(0),
+                                                total_input_pushed(0),
+                                                outerloop_count(0),
+                                                compute_cycle(0)
   {
+    if (get_env_flag("SPIKE_SPARSE"))
+      compute_cycle = new std::vector<reg_t>();
   }
 
   ~systolicArray_t()
@@ -124,10 +146,14 @@ public:
     return sa_dim;
   }
 
-  bool get_debug_flag()
+  std::vector<reg_t>* get_compute_cycles() {
+    return compute_cycle;
+  }
+
+  bool get_env_flag(const char* env)
   {
-    const char* debug_env = std::getenv("SPIKE_DEBUG");
-    const bool debug_flag = debug_env ? std::stoi(debug_env) : 0;
+    const char* env_value = std::getenv(env);
+    const bool debug_flag = env_value ? std::stoi(env_value) : 0;
     return debug_flag;
   }
 };

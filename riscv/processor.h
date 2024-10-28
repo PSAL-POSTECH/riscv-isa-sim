@@ -314,6 +314,7 @@ public:
   }
   extension_t* get_extension();
   extension_t* get_extension(const char* name);
+  systolicArray_t* get_systolicArray() { return SA; }
   bool any_custom_extensions() const {
     return !custom_extensions.empty();
   }

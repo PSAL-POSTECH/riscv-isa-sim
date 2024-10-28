@@ -29,7 +29,7 @@ void systolicArray_t::reset() {
 }
 
 void systolicArray_t::prefill_weight() {
-  bool debug_flag = get_debug_flag();
+  bool debug_flag = get_env_flag("SPIKE_DEBUG");
 
   if (weight == nullptr) {
     weight = new std::vector<std::deque<float>*>(sa_dim);
@@ -49,7 +49,7 @@ void systolicArray_t::prefill_weight() {
 
 void systolicArray_t::compute() {
   assert(!weight->at(0)->empty());
-  bool debug_flag = get_debug_flag();
+  bool debug_flag = get_env_flag("SPIKE_DEBUG");
 
   if (debug_flag){
     printf("======= COMPUTE =======\n");

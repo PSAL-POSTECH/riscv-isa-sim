@@ -224,6 +224,32 @@ static std::pair<reg_t, reg_t> make_kernel_space_info(const char * s) {
   return kernel_addr;
 }
 
+static int get_env_flag(const char *env, int default_val) {
+  const char* env_val = std::getenv(env);
+  return env_val ? std::stoi(env_val) : default_val;
+}
+
+void dump_core_cycletime(sim_t *s, const char* path) {
+  std::vector<reg_t> *cycles = s->get_core(0)->get_systolicArray()->get_compute_cycles();
+  const uint32_t n_outerloops = cycles->size();
+
+  if (get_env_flag("SPIKE_DEBUG", 0))
+    printf("Number of outerloops: %d\n", n_outerloops);
+    for (int i = 0; i < n_outerloops; i++)
+      printf("Core cycle time: %ld\n", cycles->at(i));
+
+  std::string dump_path = std::string(path) + "/spike_core_cycletime.txt";
+  FILE *fp = fopen(dump_path.c_str(), "w");
+  if (fp == NULL) {
+    fprintf(stderr, "Unable to open file '%s'\n", dump_path.c_str());
+    exit(-1);
+  }
+  for (int i = 0; i < n_outerloops; i++) {
+    fprintf(fp, "%ld\n", cycles->at(i));
+  }
+  fclose(fp);
+}
+
 int main(int argc, char** argv)
 {
   bool debug = false;
@@ -274,8 +300,9 @@ int main(int argc, char** argv)
   uint64_t scratchpad_size = 128 << 10; // 128 KB
   uint32_t vectorlane_size = 4;
   std::pair<reg_t, reg_t> kernel_addr;
-  const char* debug_env = std::getenv("SPIKE_DEBUG");
-  const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
+  const char* base_path;
+  const int debug_flag = get_env_flag("SPIKE_DEBUG", 0);
+  const int sparse_flag = get_env_flag("SPIKE_SPARSE", 0);
 
   auto const hartids_parser = [&](const char *s) {
     std::string const str(s);
@@ -410,6 +437,8 @@ int main(int argc, char** argv)
       [&](const char* s){vectorlane_size = atoul_safe(s);});
   parser.option(0, "kernel-addr", 1,
        [&](const char* s){kernel_addr = make_kernel_space_info(s);});
+  parser.option(0, "base-path", 1,
+       [&](const char* s){base_path = s;});
   auto argv1 = parser.parse(argv);
   std::vector<std::string> htif_args(argv1, (const char*const*)argv + argc);
   if (mems.empty()) {
@@ -430,8 +459,8 @@ int main(int argc, char** argv)
     for (auto& m : mems) {
       printf("MEM >> Base Addr: 0x%lx:0x%lx, Size: 0x%lx\n", m.first, m.first + m.second->size()-1, m.second->size());
     }
+    printf("Base path: %s\n", base_path);
   }
-
   if (!*argv1)
     help();
 
@@ -521,6 +550,9 @@ int main(int argc, char** argv)
   s.set_histogram(histogram);
 
   auto return_code = s.run();
+
+  // if (sparse_flag)
+  //   dump_core_cycletime(&s, base_path);
 
   for (auto& mem : mems)
     delete mem.second;
