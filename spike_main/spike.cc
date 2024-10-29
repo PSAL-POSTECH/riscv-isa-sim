@@ -551,8 +551,8 @@ int main(int argc, char** argv)
 
   auto return_code = s.run();
 
-  // if (sparse_flag)
-  //   dump_core_cycletime(&s, base_path);
+  if (sparse_flag)
+    dump_core_cycletime(&s, base_path);
 
   for (auto& mem : mems)
     delete mem.second;

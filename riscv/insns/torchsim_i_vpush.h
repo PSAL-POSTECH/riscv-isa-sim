@@ -25,4 +25,5 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
 }
 P.VU.vstart->write(0);
 P.SA->n_input += vl;
+P.SA->total_input_pushed += vl;
 P.SA->compute();

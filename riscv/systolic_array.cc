@@ -32,6 +32,7 @@ void systolicArray_t::prefill_weight() {
   bool debug_flag = get_env_flag("SPIKE_DEBUG");
 
   if (weight == nullptr) {
+    printf("weight allocation\n");
     weight = new std::vector<std::deque<float>*>(sa_dim);
     for (int i=0; i<sa_dim; i++)
       weight->at(i) = new std::deque<float>();
@@ -44,12 +45,14 @@ void systolicArray_t::prefill_weight() {
       weight->at(vl_idx)->push_back(w_serializer_vpop(vl_idx));
     }
   }
+  n_weight_push += n_weight;
   n_weight = 0;
 }
 
 void systolicArray_t::compute() {
   assert(!weight->at(0)->empty());
   bool debug_flag = get_env_flag("SPIKE_DEBUG");
+  bool sparse_flag = get_env_flag("SPIKE_SPARSE");
 
   if (debug_flag){
     printf("======= COMPUTE =======\n");
@@ -61,6 +64,12 @@ void systolicArray_t::compute() {
     }
   }
 
+  if (sparse_flag)
+    nz = 0;
+    outerloop_count = (total_input_pushed - 1) / sa_dim;
+    if (compute_cycle->size() <= outerloop_count)
+      compute_cycle->push_back(0);
+
   for (int i=0; i<n_input; i++) {
     float input_vector[sa_dim];
     float output_vector[sa_dim];
@@ -68,6 +77,9 @@ void systolicArray_t::compute() {
     for (int j=0; j<sa_dim; j++) {
       input_vector[j] = i_serializer_vpop(j);
       output_vector[j] = 0;
+
+      if (sparse_flag && input_vector[j] != 0)
+        nz++;
     }
 
     if (debug_flag) {
@@ -93,6 +105,28 @@ void systolicArray_t::compute() {
       printf("\n\n");
     }
   }
+
+  if (sparse_flag) {
+    d = sa_dim * 3;
+    if (n_weight_push > 0) {
+      reg_t prefill_cycle = sa_dim * 2 - 1; // Always weight pushed with padding?
+      compute_cycle->at(outerloop_count) += prefill_cycle;
+
+      printf("Weight Pushed: %d\n", n_weight_push);
+      printf("Prefill cycle: %ld\n", prefill_cycle);
+    }
+
+    reg_t cycle = d * (1 - alpha * (1 - nz / (sa_dim * n_input)));
+    // reg_t vpop_cycle = n_input;
+    compute_cycle->at(outerloop_count) += cycle;
+
+    printf("nz: %d\n", nz);
+    printf("d: %d\n", d);
+    printf("alpha: %f\n", alpha);
+    printf("compute cycle: %ld\n", compute_cycle->at(outerloop_count));
+  }
+
   n_output += n_input;
   n_input = 0;
+  n_weight_push = 0;
 }
