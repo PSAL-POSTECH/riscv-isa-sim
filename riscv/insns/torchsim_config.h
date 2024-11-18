@@ -14,22 +14,27 @@ enum {
 
 const int config_type = (RS2 >> 17) & 0b11; // 2 bits
 if (config_type == MVIN) {
-  P.VU.in_mm_stride[0] = RS1;
+  P.VU.in_mm_stride[0] = RS1 >> 32;
+  P.VU.in_spad_mm_stride[0] = RS1 & ((1ULL << 32) - 1);
   P.VU.in_element_size[0] = RS2 & ((1ULL << 16) - 1);
   P.VU.in_is_col_major[0] = (RS2 >> 16) & 0b1;
   P.VU.in_chunk_size[0] = RS2 >> 32;
 } else if (config_type == MVIN1) {
-  P.VU.in_mm_stride[1] = RS1;
+  P.VU.in_mm_stride[1] = RS1 >> 32;
+  P.VU.in_spad_mm_stride[1] = RS1 & ((1ULL << 32) - 1);
   P.VU.in_element_size[1] = RS2 & ((1ULL << 16) - 1);
   P.VU.in_is_col_major[1] = (RS2 >> 16) & 0b1;
   P.VU.in_chunk_size[1] = RS2 >> 32;
 } else if (config_type == MVIN2) {
+  P.VU.in_mm_stride[2] = RS1 >> 32;
+  P.VU.in_spad_mm_stride[2] = RS1 & ((1ULL << 32) - 1);
   P.VU.in_mm_stride[2] = RS1;
   P.VU.in_element_size[2] = RS2 & ((1ULL << 16) - 1);
   P.VU.in_is_col_major[2] = (RS2 >> 16) & 0b1;
   P.VU.in_chunk_size[2] = RS2 >> 32;
 } else if (config_type == MVOUT) {
-  P.VU.out_mm_stride = RS1;
+  P.VU.out_mm_stride = RS1 >> 32;
+  P.VU.out_spad_mm_stride = RS1 & ((1ULL << 32) - 1);
   P.VU.out_element_size = RS2 & ((1ULL << 16) - 1);
   P.VU.out_is_col_major = (RS2 >> 16) & 0b1;
   P.VU.out_chunk_size = RS2 >> 32;

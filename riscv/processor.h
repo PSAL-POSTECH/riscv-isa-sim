@@ -549,11 +549,13 @@ public:
       std::pair<reg_t, reg_t> sram_space;
 
       reg_t in_mm_stride[4] = {0, 0, 0, 0};
+      reg_t in_spad_mm_stride[4] = {0, 0, 0, 0};
       reg_t in_element_size[4] = {0, 0, 0, 0};
       reg_t in_chunk_size[4] = {0, 0, 0, 0};
       bool in_is_col_major[4] = {false, false, false, false};
 
       reg_t out_mm_stride = 0;
+      reg_t out_spad_mm_stride = 0;
       reg_t out_element_size = 0;
       reg_t out_chunk_size = 0;
       bool out_is_col_major = false;
