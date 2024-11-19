@@ -36,6 +36,7 @@ if (lane_split_axis)
 else
     n_used_vlane = n_row / (n_elements_per_chunk / n_col);
 
+const reg_t outer_dram_stride = lane_split_axis ? n_vu * element_size : n_vu * mm_stride;
 const reg_t block_h = lane_split_axis ? n_row : n_row / n_used_vlane;
 const reg_t block_w = lane_split_axis ? n_col / n_used_vlane : n_col;
 const reg_t dram_vlane_offet = lane_split_axis ? chunk_size : mm_stride * block_h;
@@ -71,7 +72,7 @@ if (n_used_vlane > n_vu) {
 assert(n_used_vlane <= n_vu);
 
 for (reg_t outer_idx=0; outer_idx<outer_loop; outer_idx++) {
-    reg_t dram_outer_base = dramAddr + outer_idx * n_vu * element_size;
+    reg_t dram_outer_base = dramAddr + outer_idx * outer_dram_stride;
     reg_t sram_outer_base = scratchpadAddr + outer_idx * spad_mm_stride;
     for (reg_t lane_idx=0; lane_idx<n_vu; lane_idx++) {
         reg_t dram_base = dram_outer_base + lane_idx * dram_vlane_offet;
