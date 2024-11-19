@@ -28,7 +28,6 @@ if (config_type == MVIN) {
 } else if (config_type == MVIN2) {
   P.VU.in_mm_stride[2] = RS1 >> 32;
   P.VU.in_spad_mm_stride[2] = RS1 & ((1ULL << 32) - 1);
-  P.VU.in_mm_stride[2] = RS1;
   P.VU.in_element_size[2] = RS2 & ((1ULL << 16) - 1);
   P.VU.in_is_col_major[2] = (RS2 >> 16) & 0b1;
   P.VU.in_chunk_size[2] = RS2 >> 32;
