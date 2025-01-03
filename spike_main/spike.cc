@@ -235,8 +235,8 @@ void dump_core_cycletime(sim_t *s, const char* path) {
 
   if (get_env_flag("SPIKE_DEBUG", 0))
     printf("Number of outerloops: %d\n", n_outerloops);
-    for (int i = 0; i < n_outerloops; i++)
-      printf("Core cycle time: %ld\n", cycles->at(i));
+  for (uint32_t i = 0; i < n_outerloops; i++)
+    printf("Core cycle time: %ld\n", cycles->at(i));
 
   std::string dump_path = std::string(path) + "/spike_core_cycletime.txt";
   FILE *fp = fopen(dump_path.c_str(), "w");
@@ -244,7 +244,7 @@ void dump_core_cycletime(sim_t *s, const char* path) {
     fprintf(stderr, "Unable to open file '%s'\n", dump_path.c_str());
     exit(-1);
   }
-  for (int i = 0; i < n_outerloops; i++) {
+  for (uint32_t i = 0; i < n_outerloops; i++) {
     fprintf(fp, "%ld\n", cycles->at(i));
   }
   fclose(fp);

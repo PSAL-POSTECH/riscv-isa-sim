@@ -33,11 +33,11 @@ void systolicArray_t::prefill_weight() {
 
   if (weight == nullptr) {
     weight = new std::vector<std::deque<float>*>(sa_dim);
-    for (int i=0; i<sa_dim; i++)
+    for (uint32_t i=0; i<sa_dim; i++)
       weight->at(i) = new std::deque<float>();
   }
 
-  for (reg_t vl_idx=0; vl_idx<sa_dim; vl_idx++) {
+  for (uint32_t vl_idx=0; vl_idx<sa_dim; vl_idx++) {
     for (reg_t vreg_idx=0; vreg_idx<n_weight; vreg_idx++) {
       if (weight->at(vl_idx)->size() == sa_dim)
         weight->at(vl_idx)->pop_front();
@@ -54,30 +54,30 @@ void systolicArray_t::compute() {
   if (debug_flag){
     printf("======= COMPUTE =======\n");
     printf("-------- Weight --------\n");
-    for (int i=0; i<sa_dim; i++) {
+    for (uint32_t i=0; i<sa_dim; i++) {
       for (auto iter : *(weight->at(i)))
         printf("%9f ", iter);
       printf("\n");
     }
   }
 
-  for (int i=0; i<n_input; i++) {
+  for (reg_t i=0; i<n_input; i++) {
     float input_vector[sa_dim];
     float output_vector[sa_dim];
 
-    for (int j=0; j<sa_dim; j++) {
+    for (uint32_t j=0; j<sa_dim; j++) {
       input_vector[j] = i_serializer_vpop(j);
       output_vector[j] = 0;
     }
 
     if (debug_flag) {
       printf("-------- Input --------\n");
-      for (int j=0; j<sa_dim; j++)
+      for (uint32_t j=0; j<sa_dim; j++)
         printf("%9f ", input_vector[j]);
       printf("\n");
     }
 
-    for (int j=0; j<sa_dim; j++) {
+    for (uint32_t j=0; j<sa_dim; j++) {
       int k = 0;
       for (auto iter : *(weight->at(j))) {
         output_vector[j] += input_vector[k] * iter;
@@ -88,7 +88,7 @@ void systolicArray_t::compute() {
 
     if (debug_flag) {
       printf("-------- Output --------\n");
-      for (int j=0; j<sa_dim; j++)
+      for (uint32_t j=0; j<sa_dim; j++)
         printf("%9f ", output_vector[j]);
       printf("\n\n");
     }

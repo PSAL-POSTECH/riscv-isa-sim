@@ -21,7 +21,7 @@ const reg_t chunk_size = P.VU.out_chunk_size;
 const bool is_col_major = P.VU.out_is_col_major;
 const reg_t n_vu = P.VU.get_vu_num();
 
-assert(mm_stride > 0);
+// assert(mm_stride > 0);
 assert(element_size > 0);
 assert(chunk_size > 0);
 
@@ -92,25 +92,25 @@ for (reg_t outer_idx=0; outer_idx<outer_loop; outer_idx++) {
                         uint64_t val = MMU.load_uint64(s_addr);
                         MMU.store_uint64(d_addr, val);
                         if (debug_flag) {
-                            printf("DRAM_ADDR: 0x%x SRAM_ADDR: 0x%x %lf, ", d_addr, s_addr, *((double*)&val));
+                            printf("DRAM_ADDR: 0x%lx SRAM_ADDR: 0x%lx %lf, ", d_addr, s_addr, *((double*)&val));
                         }
                     } else if (element_size == 4){
                         uint32_t val = MMU.load_uint32(s_addr);
                         MMU.store_uint32(d_addr, val);
                         if (debug_flag) {
-                            printf("DRAM_ADDR: 0x%x SRAM_ADDR: 0x%x %f, ", d_addr, s_addr, *((float*)&val));
+                            printf("DRAM_ADDR: 0x%lx SRAM_ADDR: 0x%lx %f, ", d_addr, s_addr, *((float*)&val));
                         }
                     } else if (element_size == 2){
                         uint16_t val = MMU.load_uint16(s_addr);
                         MMU.store_uint16(d_addr, val);
                         if (debug_flag) {
-                            printf("DRAM_ADDR: 0x%x SRAM_ADDR: 0x%x %x, ", d_addr, s_addr, *((short*)&val));
+                            printf("DRAM_ADDR: 0x%lx SRAM_ADDR: 0x%lx %x, ", d_addr, s_addr, *((short*)&val));
                         }
                     } else if (element_size == 1){
                         uint8_t val = MMU.load_uint8(s_addr);
                         MMU.store_uint8(d_addr, val);
                         if (debug_flag) {
-                            printf("DRAM_ADDR: 0x%x SRAM_ADDR: 0x%x %x, ", d_addr, s_addr, *((char*)&val));
+                            printf("DRAM_ADDR: 0x%lx SRAM_ADDR: 0x%lx %x, ", d_addr, s_addr, *((char*)&val));
                         }
                     }
                 }

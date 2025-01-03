@@ -8,7 +8,7 @@ const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
 for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
     P.VU.vstart->write(vstart);
     if (debug_flag) {
-        printf("[VPUSH_W] lane[%d]", vu_idx);
+        printf("[VPUSH_W] lane[%ld]", vu_idx);
     }
     for (reg_t i = 0; i < vl; ++i) {
         VI_STRIP(i);

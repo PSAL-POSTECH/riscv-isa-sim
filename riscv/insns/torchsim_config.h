@@ -5,11 +5,15 @@
 // rs2[16] = is_col_major
 // rs2[18:17] = mvin setting_idx to set (0 ~ 3)
 // rs2[63:32] = chunk size
+
+const char* debug_env = std::getenv("SPIKE_DEBUG");
+const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
+
 enum {
   MVIN = 0,
-  MVIN1,
-  MVIN2,
-  MVOUT,
+  MVIN1,  // 1
+  MVIN2,  // 2
+  MVOUT,  // 3
 } config_t;
 
 const int config_type = (RS2 >> 17) & 0b11; // 2 bits
@@ -40,4 +44,23 @@ if (config_type == MVIN) {
 } else {
   // Invalid config type
   assert(0);
+}
+
+if (debug_flag) {
+  if (config_type >=0 && config_type <= 2) {
+    printf("======== CONFIG %d =========\n", config_type);
+    printf("mm_stride = %ld\n", P.VU.in_mm_stride[config_type]);
+    printf("spad_mm_stride = %ld\n", P.VU.in_spad_mm_stride[config_type]);
+    printf("element_size = %ld\n", P.VU.in_element_size[config_type]);
+    printf("is_col_major = %d\n", P.VU.in_is_col_major[config_type]);
+    printf("chunk_size = %ld\n", P.VU.in_chunk_size[config_type]);
+  }
+  else {
+    printf("======== CONFIG %d =========\n", config_type);
+    printf("mm_stride = %ld\n", P.VU.out_mm_stride);
+    printf("spad_mm_stride = %ld\n", P.VU.out_spad_mm_stride);
+    printf("element_size = %ld\n", P.VU.out_element_size);
+    printf("is_col_major = %d\n", P.VU.out_is_col_major);
+    printf("chunk_size = %ld\n", P.VU.out_chunk_size);
+  }
 }

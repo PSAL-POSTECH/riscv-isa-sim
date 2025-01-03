@@ -9,7 +9,7 @@ assert(P.SA->n_output >= vl);
 for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
     P.VU.vstart->write(vstart);
     if (debug_flag) {
-        printf("[VPOP] lane[%d]", vu_idx);
+        printf("[VPOP] lane[%ld]", vu_idx);
     }
     for (reg_t i = 0; i < vl; ++i) {
         if (P.SA->deserializer[vu_idx]->empty())
