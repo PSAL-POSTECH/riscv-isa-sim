@@ -17,6 +17,8 @@
 #include "csrs.h"
 #include "systolic_array.h"
 
+#define MAX_TENSOR_DIM_SIZE 4
+
 class processor_t;
 class mmu_t;
 typedef reg_t (*insn_func_t)(processor_t*, insn_t, reg_t);
@@ -548,17 +550,15 @@ public:
       reg_t n_vu;
       std::pair<reg_t, reg_t> sram_space;
 
-      reg_t in_mm_stride[4] = {0, 0, 0, 0};
-      reg_t in_spad_mm_stride[4] = {0, 0, 0, 0};
-      reg_t in_element_size[4] = {0, 0, 0, 0};
-      reg_t in_chunk_size[4] = {0, 0, 0, 0};
-      bool in_is_col_major[4] = {false, false, false, false};
+      // Config called for every dma operation
+      reg_t dma_dim_size[MAX_TENSOR_DIM_SIZE] = {0, 0, 0, 0};
+      reg_t dma_mm_stride[MAX_TENSOR_DIM_SIZE] = {0, 0, 0, 0};
+      reg_t dma_spad_stride[MAX_TENSOR_DIM_SIZE] = {0, 0, 0, 0};
+      reg_t dma_element_size = 0;
+      reg_t dma_vlane_stride = 0;
 
-      reg_t out_mm_stride = 0;
-      reg_t out_spad_mm_stride = 0;
-      reg_t out_element_size = 0;
-      reg_t out_chunk_size = 0;
-      bool out_is_col_major = false;
+      int dma_vlane_split_axis;
+      bool dma_is_col_major;
 
       // VU SRAM
       reg_t vu_sram_byte = 128 << 10;

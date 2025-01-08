@@ -1,13 +1,25 @@
-// Custom instruction config_mvin
-// config_mvin rs1, rs2
-// rs1 = main-memory stride
-// rs2[15:0] = element size
-// rs2[16] = is_col_major
-// rs2[18:17] = mvin setting_idx to set (0 ~ 3)
-// rs2[63:32] = chunk size
-
 const char* debug_env = std::getenv("SPIKE_DEBUG");
 const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
+
+/*
+// RS1
+rs1[63:48]: 1st dim size
+rs1[47:32]: 2nd dim size
+rs1[31:16]: 3rd dim size
+rs1[15:0]: 4th dim size
+
+// RS2
+rs2[13:0]: element size
+rs2[15:14]:  vlane_split_axis
+  0: 1st dim, 1: 2nd dim, 2: 3rd dim, 3: 4th dimrs2[16]: is_col_major
+rs2[16]: is_col_major
+rs2[18:17]: mvin setting to set (0 ~ 3)
+- CONFIG_MVIN 0x0
+- CONFIG_MVIN2 0x1
+- CONFIG_MVIN3 0x2
+- CONFIG_MVOUT 0x3
+rs2[63:32]: vlane stride
+*/
 
 enum {
   MVIN = 0,
@@ -17,50 +29,24 @@ enum {
 } config_t;
 
 const int config_type = (RS2 >> 17) & 0b11; // 2 bits
-if (config_type == MVIN) {
-  P.VU.in_mm_stride[0] = RS1 >> 32;
-  P.VU.in_spad_mm_stride[0] = RS1 & ((1ULL << 32) - 1);
-  P.VU.in_element_size[0] = RS2 & ((1ULL << 16) - 1);
-  P.VU.in_is_col_major[0] = (RS2 >> 16) & 0b1;
-  P.VU.in_chunk_size[0] = RS2 >> 32;
-} else if (config_type == MVIN1) {
-  P.VU.in_mm_stride[1] = RS1 >> 32;
-  P.VU.in_spad_mm_stride[1] = RS1 & ((1ULL << 32) - 1);
-  P.VU.in_element_size[1] = RS2 & ((1ULL << 16) - 1);
-  P.VU.in_is_col_major[1] = (RS2 >> 16) & 0b1;
-  P.VU.in_chunk_size[1] = RS2 >> 32;
-} else if (config_type == MVIN2) {
-  P.VU.in_mm_stride[2] = RS1 >> 32;
-  P.VU.in_spad_mm_stride[2] = RS1 & ((1ULL << 32) - 1);
-  P.VU.in_element_size[2] = RS2 & ((1ULL << 16) - 1);
-  P.VU.in_is_col_major[2] = (RS2 >> 16) & 0b1;
-  P.VU.in_chunk_size[2] = RS2 >> 32;
-} else if (config_type == MVOUT) {
-  P.VU.out_mm_stride = RS1 >> 32;
-  P.VU.out_spad_mm_stride = RS1 & ((1ULL << 32) - 1);
-  P.VU.out_element_size = RS2 & ((1ULL << 16) - 1);
-  P.VU.out_is_col_major = (RS2 >> 16) & 0b1;
-  P.VU.out_chunk_size = RS2 >> 32;
-} else {
-  // Invalid config type
-  assert(0);
-}
+
+// RS1
+P.VU.dma_dim_size[0] = RS1 >> 48;
+P.VU.dma_dim_size[1] = (RS1 >> 32) & 0xFFFF;
+P.VU.dma_dim_size[2] = (RS1 >> 16) & 0xFFFF;
+P.VU.dma_dim_size[3] = RS1 & 0xFFFF;
+
+// RS2
+P.VU.dma_element_size = RS2 & (1ULL << 14 - 1);
+P.VU.dma_vlane_split_axis = (RS2 >> 14) & 0b11;
+P.VU.dma_is_col_major = (RS2 >> 16) & 0b1;
+P.VU.dma_vlane_stride = RS2 >> 32;
 
 if (debug_flag) {
-  if (config_type >=0 && config_type <= 2) {
-    printf("======== CONFIG %d =========\n", config_type);
-    printf("mm_stride = %ld\n", P.VU.in_mm_stride[config_type]);
-    printf("spad_mm_stride = %ld\n", P.VU.in_spad_mm_stride[config_type]);
-    printf("element_size = %ld\n", P.VU.in_element_size[config_type]);
-    printf("is_col_major = %d\n", P.VU.in_is_col_major[config_type]);
-    printf("chunk_size = %ld\n", P.VU.in_chunk_size[config_type]);
-  }
-  else {
-    printf("======== CONFIG %d =========\n", config_type);
-    printf("mm_stride = %ld\n", P.VU.out_mm_stride);
-    printf("spad_mm_stride = %ld\n", P.VU.out_spad_mm_stride);
-    printf("element_size = %ld\n", P.VU.out_element_size);
-    printf("is_col_major = %d\n", P.VU.out_is_col_major);
-    printf("chunk_size = %ld\n", P.VU.out_chunk_size);
-  }
+  printf("======== CONFIG =========\n");
+  printf("mm_stride = (%ld, %ld, %ld, %ld)\n", P.VU.dma_dim_size[0], P.VU.dma_dim_size[1], P.VU.dma_dim_size[2], P.VU.dma_dim_size[3]);
+  printf("element_size = %ld\n", P.VU.dma_element_size);
+  printf("vlane_split_axis = %d\n", P.VU.dma_vlane_split_axis);
+  printf("is_col_major = %d\n", P.VU.dma_is_col_major);
+  printf("chunk_size = %ld\n", P.VU.dma_vlane_stride);
 }

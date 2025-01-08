@@ -125,6 +125,8 @@ riscv_insn_ext_i = \
 	torchsim_mvin3 \
 	torchsim_mvout \
 	torchsim_config \
+	torchsim_config2 \
+	torchsim_config3 \
 	torchsim_i_vpush \
 	torchsim_w_vpush \
 	torchsim_vpop \
