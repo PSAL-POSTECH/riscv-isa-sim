@@ -38,14 +38,17 @@ P.VU.dma_dim_size[2] = (RS1 >> 16) & 0xFFFF;
 P.VU.dma_dim_size[3] = RS1 & 0xFFFF;
 
 // RS2
-P.VU.dma_element_size = RS2 & (1ULL << 14 - 1);
+P.VU.dma_element_size = RS2 & ((1ULL << 14) - 1);
 P.VU.dma_vlane_split_axis = (RS2 >> 14) & 0b11;
 P.VU.dma_vlane_stride = RS2 >> 32;
 
 if (debug_flag) {
   printf("======== CONFIG =========\n");
-  printf("mm_stride = (%ld, %ld, %ld, %ld)\n", P.VU.dma_dim_size[0], P.VU.dma_dim_size[1], P.VU.dma_dim_size[2], P.VU.dma_dim_size[3]);
+  printf("RS1: %llx\n", RS1);
+  printf("RS2: %llx\n", RS2);
+
+  printf("dim_size = (%ld, %ld, %ld, %ld)\n", P.VU.dma_dim_size[0], P.VU.dma_dim_size[1], P.VU.dma_dim_size[2], P.VU.dma_dim_size[3]);
   printf("element_size = %ld\n", P.VU.dma_element_size);
   printf("vlane_split_axis = %d\n", P.VU.dma_vlane_split_axis);
-  printf("chunk_size = %ld\n", P.VU.dma_vlane_stride);
+  printf("vlane_stride = %ld\n", P.VU.dma_vlane_stride);
 }
