@@ -123,19 +123,19 @@ if (debug_flag) {
 reg_t factor, outerloop_factor, outerloop_stride;
 if (vlane_split_axis == N) {
     factor = p_dim_size[1] * p_dim_size[2] * p_dim_size[3];
-    outerloop_stride = p_spad_stride[0];
+    outerloop_stride = p_spad_stride[0] * vlane_stride;
     outerloop_factor = block_shape[0] * block_shape[1] * block_shape[2] * n_vu * vlane_stride;
 } else if (vlane_split_axis == C) {
-    factor = p_dim_size[2] * p_dim_size[3];
+    factor = p_dim_size[2] * p_dim_size[3] * vlane_stride;
     outerloop_stride = p_spad_stride[1];
     outerloop_factor = block_shape[0] * block_shape[1] * n_vu * vlane_stride;
 } else if (vlane_split_axis == H) {
     factor = p_dim_size[3];
-    outerloop_stride = p_spad_stride[2];
+    outerloop_stride = p_spad_stride[2] * vlane_stride;
     outerloop_factor = block_shape[0] * n_vu * vlane_stride;
 } else if (vlane_split_axis == W) {
     factor = 1;
-    outerloop_stride = p_spad_stride[3];
+    outerloop_stride = p_spad_stride[3] * vlane_stride;
     outerloop_factor = n_vu * vlane_stride;
 }
 
