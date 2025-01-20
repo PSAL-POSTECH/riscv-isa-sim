@@ -2,11 +2,13 @@
 // mvin rs1, rs2
 // rs1 = virtual main memory address
 // rs2: scratchpad address
+#include "dma_utils.h"
 
 #define N 0
 #define C 1
 #define H 2
 #define W 3
+
 
 const char* debug_env = std::getenv("SPIKE_DEBUG");
 const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
@@ -50,32 +52,23 @@ if (debug_flag) {
 assert(element_size > 0);
 assert(vlane_stride > 0);
 
-void *dma_tensor = nullptr;
+void *dma_buffer = nullptr;
 if (element_size == 1)
-    dma_tensor = new uint8_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
+    dma_buffer = new uint8_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
 else if (element_size == 2)
-    dma_tensor = new uint16_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
+    dma_buffer = new uint16_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
 else if (element_size == 4)
-    dma_tensor = new uint32_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
+    dma_buffer = new uint32_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
 else if (element_size == 8)
-    dma_tensor = new uint64_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
+    dma_buffer = new uint64_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
 else
     assert(0);
 
 reg_t n, c, h, w;
-reg_t *p_split_dim;
 
-if (vlane_split_axis == N)
-    p_split_dim = &n;
-else if (vlane_split_axis == C)
-    p_split_dim = &c;
-else if (vlane_split_axis == H)
-    p_split_dim = &h;
-else if (vlane_split_axis == W)
-    p_split_dim = &w;
-else
-    assert(0);
-
+if (debug_flag) {
+    printf("Load data from mm:\n");
+}
 // Load data from memory by mm_stride
 for (n=0; n<p_dim_size[0]; n++) {
     for (c=0; c<p_dim_size[1]; c++) {
@@ -83,30 +76,33 @@ for (n=0; n<p_dim_size[0]; n++) {
             for (w=0; w<p_dim_size[3]; w++) {
                 reg_t d_offset = (n * p_mm_stride[0] + c * p_mm_stride[1] + h * p_mm_stride[2] + w * p_mm_stride[3]) * element_size;
                 reg_t d_addr = dramAddr + d_offset;
-
                 if (element_size == 1) {
                     uint8_t val = MMU.load_uint8(d_addr);
-                    static_cast<uint8_t*>(dma_tensor)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
+                    static_cast<uint8_t*>(dma_buffer)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
                 } else if (element_size == 2) {
                     uint16_t val = MMU.load_uint16(d_addr);
-                    static_cast<uint16_t*>(dma_tensor)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
+                    static_cast<uint16_t*>(dma_buffer)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
                 } else if (element_size == 4) {
                     uint32_t val = MMU.load_uint32(d_addr);
-                    static_cast<uint32_t*>(dma_tensor)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
+                    static_cast<uint32_t*>(dma_buffer)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
+                    if (debug_flag) {
+                        printf("d_addr: 0x%lx, d_offset_index: %ld, Val: %f\n", d_addr, d_offset/element_size, val);
+                    }
                 } else if (element_size == 8) {
                     uint64_t val = MMU.load_uint64(d_addr);
-                    static_cast<uint64_t*>(dma_tensor)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
+                    static_cast<uint64_t*>(dma_buffer)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
                 }
             }
         }
     }
 }
 
-// print dma_tensor
+
+// print dma_buffer
 if (debug_flag) {
     printf("[[ MVIN TENSOR ]]\n");
     for (int i=0; i<p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]; i++) {
-        printf("%f ", *(float *)&(static_cast<uint32_t*>(dma_tensor)[i]));
+        printf("%f ", *(float *)&(static_cast<uint32_t*>(dma_buffer)[i]));
     }
     printf("\n");
 }
@@ -120,24 +116,67 @@ if (debug_flag) {
     printf("- Block_shape: (%ld, %ld, %ld, %ld)\n", block_shape[0], block_shape[1], block_shape[2], block_shape[3]);
 }
 
+typedef struct {
+    uint32_t dim;
+    reg_t stride;
+} Stride_info;
+Stride_info spad_stride[4] = {{N, p_spad_stride[0]}, {C, p_spad_stride[1]}, {H, p_spad_stride[2]}, {W, p_spad_stride[3]}};
+uint32_t dim_seq[4] = {N, C, H, W};
+
+uint32_t n_dim=0;
+// Sort by spad_stride
+for (int i=0; i<4; i++) {
+    if (spad_stride[i].stride == 0)
+        continue;
+    if (n_dim==0)
+        n_dim = i;
+    for (int j=i+1; j<4; j++) {
+        if (spad_stride[i].stride < spad_stride[j].stride) {
+            Stride_info temp = spad_stride[i];
+            spad_stride[i] = spad_stride[j];
+            spad_stride[j] = temp;
+
+            // change dim seq
+            uint32_t temp_dim = dim_seq[i];
+            dim_seq[i] = dim_seq[j];
+            dim_seq[j] = temp_dim;
+        }
+    }
+}
+
+for (int i=dim_seq[vlane_split_axis]-1; i>=n_dim; i--) {
+    spad_stride[i].stride /= (p_spad_stride[dim_seq[vlane_split_axis]]/vlane_stride);
+}
+
+if (debug_flag) {
+    printf("dim_seq: (%d, %d, %d, %d)\n", dim_seq[0], dim_seq[1], dim_seq[2], dim_seq[3]);
+    printf("spad_stride: (%d, %d, %d, %d)\n", spad_stride[0].stride, spad_stride[1].stride, spad_stride[2].stride, spad_stride[3].stride);
+}
+
+reg_t *p_split_dim;
 reg_t factor, outerloop_factor, outerloop_stride;
 if (vlane_split_axis == N) {
+    p_split_dim = &n;
     factor = p_dim_size[1] * p_dim_size[2] * p_dim_size[3];
-    outerloop_stride = p_spad_stride[0] * vlane_stride;
+    outerloop_stride = spad_stride[dim_seq[N]].stride * vlane_stride;
     outerloop_factor = block_shape[0] * block_shape[1] * block_shape[2] * n_vu * vlane_stride;
 } else if (vlane_split_axis == C) {
+    p_split_dim = &c;
     factor = p_dim_size[2] * p_dim_size[3] * vlane_stride;
-    outerloop_stride = p_spad_stride[1];
+    outerloop_stride = spad_stride[dim_seq[C]].stride * vlane_stride;
     outerloop_factor = block_shape[0] * block_shape[1] * n_vu * vlane_stride;
 } else if (vlane_split_axis == H) {
+    p_split_dim = &h;
     factor = p_dim_size[3];
-    outerloop_stride = p_spad_stride[2] * vlane_stride;
+    outerloop_stride = spad_stride[dim_seq[H]].stride * vlane_stride;
     outerloop_factor = block_shape[0] * n_vu * vlane_stride;
 } else if (vlane_split_axis == W) {
+    p_split_dim = &w;
     factor = 1;
-    outerloop_stride = p_spad_stride[3] * vlane_stride;
+    outerloop_stride = spad_stride[dim_seq[W]].stride * vlane_stride;
     outerloop_factor = n_vu * vlane_stride;
-}
+} else
+    assert(0);
 
 if (debug_flag) {
     printf("- factor = %ld\n", factor);
@@ -156,31 +195,32 @@ for (int outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++){
             for (c=0; c<block_shape[1]; c++) {
                 for (h=0; h<block_shape[2]; h++) {
                     for (w=0; w<block_shape[3]; w++) {
-                        reg_t s_offset = (outerloop_idx * outerloop_stride + n * p_spad_stride[0] + c * p_spad_stride[1] + h * p_spad_stride[2] + w * p_spad_stride[3]) * element_size;
+                        reg_t s_offset = (outerloop_idx * outerloop_stride + n * spad_stride[dim_seq[N]].stride + c * spad_stride[dim_seq[C]].stride + h * spad_stride[dim_seq[H]].stride + w * spad_stride[dim_seq[W]].stride) * element_size;
                         reg_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
 
                         if (element_size == 1) {
                             uint8_t val = 0;
                             if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint8_t*>(dma_tensor)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
+                                val = static_cast<uint8_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
                             MMU.store_uint8(s_addr, val);
                         } else if (element_size == 2) {
                             uint16_t val = 0;
                             if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint16_t*>(dma_tensor)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
+                                val = static_cast<uint16_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
                             MMU.store_uint16(s_addr, val);
                         } else if (element_size == 4) {
                             uint32_t val = 0;
                             if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint32_t*>(dma_tensor)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
+                                val = static_cast<uint32_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
                             if (debug_flag) {
+                                printf("(n, c, h, w): (%d, %d, %d, %d), spad_stride(n, c, h, w): (%d, %d, %d, %d)\n", n, c, h, w, spad_stride[dim_seq[N]].stride, spad_stride[dim_seq[C]].stride, spad_stride[dim_seq[H]].stride, spad_stride[dim_seq[W]].stride);
                                 printf("spad_addr: 0x%lx, value: %f\n", s_addr, *(float *)&(val));
                             }
                             MMU.store_uint32(s_addr, val);
                         } else if (element_size == 8) {
                             uint64_t val = 0;
                             if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint64_t*>(dma_tensor)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
+                                val = static_cast<uint64_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
                             MMU.store_uint64(s_addr, val);
                         }
                     }
@@ -190,4 +230,4 @@ for (int outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++){
     }
 }
 
-delete [] dma_tensor;
+delete [] dma_buffer;
