@@ -2,8 +2,6 @@
 // mvin rs1, rs2
 // rs1 = virtual main memory address
 // rs2: scratchpad address
-#include "dma_utils.h"
-
 #define N 0
 #define C 1
 #define H 2
@@ -86,7 +84,7 @@ for (n=0; n<p_dim_size[0]; n++) {
                     uint32_t val = MMU.load_uint32(d_addr);
                     static_cast<uint32_t*>(dma_buffer)[n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w] = val;
                     if (debug_flag) {
-                        printf("d_addr: 0x%lx, d_offset_index: %ld, Val: %f\n", d_addr, d_offset/element_size, val);
+                        printf("d_addr: 0x%lx, d_offset_index: %ld, Val: %f\n", d_addr, d_offset/element_size, *(float *)&val);
                     }
                 } else if (element_size == 8) {
                     uint64_t val = MMU.load_uint64(d_addr);
@@ -97,7 +95,6 @@ for (n=0; n<p_dim_size[0]; n++) {
     }
 }
 
-
 // print dma_buffer
 if (debug_flag) {
     printf("[[ MVIN TENSOR ]]\n");
@@ -107,122 +104,185 @@ if (debug_flag) {
     printf("\n");
 }
 
-// Store data to scratchpad by spad_stride
-reg_t used_vlane = (p_dim_size[vlane_split_axis] + vlane_stride - 1) / vlane_stride;
-reg_t block_shape[4] = {p_dim_size[0], p_dim_size[1], p_dim_size[2], p_dim_size[3]};
-block_shape[vlane_split_axis] = vlane_stride;
+// Subtensor buffer (outerloop block concatenated)
+reg_t used_vlane = n_outerloop > 1 ? n_vu : (p_dim_size[vlane_split_axis] + vlane_stride - 1) / vlane_stride;
+reg_t subtensor_dim[4] = {p_dim_size[0], p_dim_size[1], p_dim_size[2], p_dim_size[3]};
+subtensor_dim[vlane_split_axis] = vlane_stride * n_outerloop;
 
-if (debug_flag) {
-    printf("- Block_shape: (%ld, %ld, %ld, %ld)\n", block_shape[0], block_shape[1], block_shape[2], block_shape[3]);
-}
+void *subtensor_buffer = nullptr;
+if (element_size == 1)
+    subtensor_buffer = new uint8_t[subtensor_dim[N] * subtensor_dim[C] * subtensor_dim[H] * subtensor_dim[W]];
+else if (element_size == 2)
+    subtensor_buffer = new uint16_t[subtensor_dim[N] * subtensor_dim[C] * subtensor_dim[H] * subtensor_dim[W]];
+else if (element_size == 4)
+    subtensor_buffer = new uint32_t[subtensor_dim[N] * subtensor_dim[C] * subtensor_dim[H] * subtensor_dim[W]];
+else if (element_size == 8)
+    subtensor_buffer = new uint64_t[subtensor_dim[N] * subtensor_dim[C] * subtensor_dim[H] * subtensor_dim[W]];
+else
+    assert(0);
 
+
+// Reorder spad stride
 typedef struct {
     uint32_t dim;
     reg_t stride;
 } Stride_info;
-Stride_info spad_stride[4] = {{N, p_spad_stride[0]}, {C, p_spad_stride[1]}, {H, p_spad_stride[2]}, {W, p_spad_stride[3]}};
-uint32_t dim_seq[4] = {N, C, H, W};
+Stride_info reorder_stride[4] = {{N, p_spad_stride[0]}, {C, p_spad_stride[1]}, {H, p_spad_stride[2]}, {W, p_spad_stride[3]}};
 
-uint32_t n_dim=0;
 // Sort by spad_stride
 for (int i=0; i<4; i++) {
-    if (spad_stride[i].stride == 0)
+    if (reorder_stride[i].stride == 0)
         continue;
-    if (n_dim==0)
-        n_dim = i;
     for (int j=i+1; j<4; j++) {
-        if (spad_stride[i].stride < spad_stride[j].stride) {
-            Stride_info temp = spad_stride[i];
-            spad_stride[i] = spad_stride[j];
-            spad_stride[j] = temp;
-
-            // change dim seq
-            uint32_t temp_dim = dim_seq[i];
-            dim_seq[i] = dim_seq[j];
-            dim_seq[j] = temp_dim;
+        if (reorder_stride[i].stride < reorder_stride[j].stride) {
+            Stride_info temp = reorder_stride[i];
+            reorder_stride[i] = reorder_stride[j];
+            reorder_stride[j] = temp;
         }
     }
 }
 
-for (int i=dim_seq[vlane_split_axis]-1; i>=n_dim; i--) {
-    spad_stride[i].stride /= (p_spad_stride[dim_seq[vlane_split_axis]]/vlane_stride);
+if (debug_flag) {
+    printf("Reorder spad stride:\n");
+    for (int i=0; i<4; i++) {
+        printf("dim: %d, stride: %ld\n", reorder_stride[i].dim, reorder_stride[i].stride);
+    }
+}
+
+// Calculate subtensor stride
+reg_t divide_factor = 1;
+for (int i=H; i>=0; i--) {
+    if (reorder_stride[i].stride == 0)
+        break;
+    if (reorder_stride[i+1].dim == vlane_split_axis) {
+        divide_factor = (reorder_stride[i].stride / reorder_stride[i+1].stride) / (vlane_stride * n_outerloop);
+    }
+    reorder_stride[i].stride /= divide_factor;
+}
+reg_t subtensor_stride[4];
+for (int i=0; i<4; i++) {
+    subtensor_stride[reorder_stride[i].dim] = reorder_stride[i].stride;
 }
 
 if (debug_flag) {
-    printf("dim_seq: (%d, %d, %d, %d)\n", dim_seq[0], dim_seq[1], dim_seq[2], dim_seq[3]);
-    printf("spad_stride: (%d, %d, %d, %d)\n", spad_stride[0].stride, spad_stride[1].stride, spad_stride[2].stride, spad_stride[3].stride);
+    printf("divide factor: %ld\n", divide_factor);
+    printf("used_vlane: %ld\n", used_vlane);
+    printf("Subtensor dim: (%ld, %ld, %ld, %ld)\n", subtensor_dim[0], subtensor_dim[1], subtensor_dim[2], subtensor_dim[3]);
+    printf("Subtensor stride: (%ld, %ld, %ld, %ld)\n", subtensor_stride[0], subtensor_stride[1], subtensor_stride[2], subtensor_stride[3]);
 }
 
 reg_t *p_split_dim;
-reg_t factor, outerloop_factor, outerloop_stride;
+reg_t vlane_index_stride, outerloop_stride;
 if (vlane_split_axis == N) {
     p_split_dim = &n;
-    factor = p_dim_size[1] * p_dim_size[2] * p_dim_size[3];
-    outerloop_stride = spad_stride[dim_seq[N]].stride * vlane_stride;
-    outerloop_factor = block_shape[0] * block_shape[1] * block_shape[2] * n_vu * vlane_stride;
+    vlane_index_stride = p_dim_size[C] * p_dim_size[H] * p_dim_size[W] * vlane_stride;
+    outerloop_stride = subtensor_dim[C] * subtensor_dim[H] * subtensor_dim[W] * vlane_stride * (n_vu - 1);
 } else if (vlane_split_axis == C) {
     p_split_dim = &c;
-    factor = p_dim_size[2] * p_dim_size[3] * vlane_stride;
-    outerloop_stride = spad_stride[dim_seq[C]].stride * vlane_stride;
-    outerloop_factor = block_shape[0] * block_shape[1] * n_vu * vlane_stride;
+    vlane_index_stride = p_dim_size[H] * p_dim_size[W] * vlane_stride;
+    outerloop_stride = subtensor_dim[H] * subtensor_dim[W] * vlane_stride * (n_vu - 1);
 } else if (vlane_split_axis == H) {
     p_split_dim = &h;
-    factor = p_dim_size[3];
-    outerloop_stride = spad_stride[dim_seq[H]].stride * vlane_stride;
-    outerloop_factor = block_shape[0] * n_vu * vlane_stride;
+    vlane_index_stride = p_dim_size[W] * vlane_stride;
+    outerloop_stride = subtensor_dim[W] * vlane_stride * (n_vu - 1);
 } else if (vlane_split_axis == W) {
     p_split_dim = &w;
-    factor = 1;
-    outerloop_stride = spad_stride[dim_seq[W]].stride * vlane_stride;
-    outerloop_factor = n_vu * vlane_stride;
+    vlane_index_stride = vlane_stride;
+    outerloop_stride = vlane_stride * (n_vu - 1);
 } else
     assert(0);
 
 if (debug_flag) {
-    printf("- factor = %ld\n", factor);
-    printf("- outerloop_factor = %ld\n", outerloop_factor);
-    printf("- outerloop_stride = %ld\n", outerloop_stride);
+    printf("Outerloop stride: %ld\n", outerloop_stride);
+    printf("Vlane index stride: %ld\n", vlane_index_stride);
 }
 
-for (int outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++){
-    for (int vlane_idx=0; vlane_idx<n_vu; vlane_idx++) {
-        bool padding_flag = vlane_idx >= used_vlane;
-        if (debug_flag) {
-            printf("<<< Vlane: %d, Padding: %d >>>\n", vlane_idx, padding_flag);
+// Store subtensors to scratchpad by vector lanes
+for (int vlane_idx=0; vlane_idx<used_vlane; vlane_idx++) {
+    if (debug_flag) {
+        printf("<<< Vlane: %d >>>\n", vlane_idx);
+    }
+    // Load subtensor to subtensor buffer
+    for (n=0; n<subtensor_dim[0]; n++) {
+        for (c=0; c<subtensor_dim[1]; c++) {
+            for (h=0; h<subtensor_dim[2]; h++) {
+                for (w=0; w<subtensor_dim[3]; w++) {
+                    reg_t index = vlane_index_stride * vlane_idx + n * subtensor_dim[C] * subtensor_dim[H] * subtensor_dim[W] + c * subtensor_dim[H] * subtensor_dim[W] + h * subtensor_dim[W] + w;
+                    if (*p_split_dim >= vlane_stride)
+                        index += outerloop_stride * (*p_split_dim / vlane_stride);
+
+                    if (element_size == 1)
+                        static_cast<uint8_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w] = static_cast<uint8_t*>(dma_buffer)[index];
+                    else if (element_size == 2)
+                        static_cast<uint16_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w] = static_cast<uint16_t*>(dma_buffer)[index];
+                    else if (element_size == 4)
+                        static_cast<uint32_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w] = static_cast<uint32_t*>(dma_buffer)[index];
+                    else if (element_size == 8)
+                        static_cast<uint64_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w] = static_cast<uint64_t*>(dma_buffer)[index];
+
+                    if (debug_flag) {
+                        printf("p_split_dim: %d, vlane_stride: %d, outerloop: %d, index: %ld, Val: %f\n", *p_split_dim, vlane_stride, (*p_split_dim) / vlane_stride, index, *(float *)&static_cast<uint32_t*>(dma_buffer)[index]);
+                    }
+                }
+            }
         }
+    }
 
-        for (n=0; n<block_shape[0]; n++) {
-            for (c=0; c<block_shape[1]; c++) {
-                for (h=0; h<block_shape[2]; h++) {
-                    for (w=0; w<block_shape[3]; w++) {
-                        reg_t s_offset = (outerloop_idx * outerloop_stride + n * spad_stride[dim_seq[N]].stride + c * spad_stride[dim_seq[C]].stride + h * spad_stride[dim_seq[H]].stride + w * spad_stride[dim_seq[W]].stride) * element_size;
-                        reg_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
+    // Print subtensor buffer
+    if (debug_flag) {
+        printf("[[ SUBTENSOR %d ]]\n", vlane_idx);
+        for (int i=0; i<subtensor_dim[0] * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3]; i++) {
+            printf("%f ", *(float *)&(static_cast<uint32_t*>(subtensor_buffer)[i]));
+        }
+        printf("\n");
+    }
 
-                        if (element_size == 1) {
-                            uint8_t val = 0;
-                            if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint8_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
-                            MMU.store_uint8(s_addr, val);
-                        } else if (element_size == 2) {
-                            uint16_t val = 0;
-                            if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint16_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
-                            MMU.store_uint16(s_addr, val);
-                        } else if (element_size == 4) {
-                            uint32_t val = 0;
-                            if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint32_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
-                            if (debug_flag) {
-                                printf("(n, c, h, w): (%d, %d, %d, %d), spad_stride(n, c, h, w): (%d, %d, %d, %d)\n", n, c, h, w, spad_stride[dim_seq[N]].stride, spad_stride[dim_seq[C]].stride, spad_stride[dim_seq[H]].stride, spad_stride[dim_seq[W]].stride);
-                                printf("spad_addr: 0x%lx, value: %f\n", s_addr, *(float *)&(val));
-                            }
-                            MMU.store_uint32(s_addr, val);
-                        } else if (element_size == 8) {
-                            uint64_t val = 0;
-                            if (!padding_flag && *p_split_dim < vlane_stride)
-                                val = static_cast<uint64_t*>(dma_buffer)[outerloop_idx * outerloop_factor + vlane_idx * vlane_stride * factor + n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w];
-                            MMU.store_uint64(s_addr, val);
+    // Store subtensor buffer to scratchpad
+    for (n=0; n<subtensor_dim[0]; n++) {
+        for (c=0; c<subtensor_dim[1]; c++) {
+            for (h=0; h<subtensor_dim[2]; h++) {
+                for (w=0; w<subtensor_dim[3]; w++) {
+                    reg_t s_offset = (n * subtensor_stride[0] + c * subtensor_stride[1] + h * subtensor_stride[2] + w * subtensor_stride[3]) * element_size;
+                    reg_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
+
+                    if (element_size == 1) {
+                        uint8_t val = static_cast<uint8_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w];
+                        MMU.store_uint8(s_addr, val);
+                    } else if (element_size == 2) {
+                        uint16_t val = static_cast<uint16_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w];
+                        MMU.store_uint16(s_addr, val);
+                    } else if (element_size == 4) {
+                        uint32_t val = static_cast<uint32_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w];
+                        if (debug_flag) {
+                            printf("s_offset/element_size: %ld, s_addr: 0x%lx, val: %f\n", s_offset/element_size, s_addr, *(float *)&val);
                         }
+                        MMU.store_uint32(s_addr, val);
+                    } else if (element_size == 8) {
+                        uint64_t val = static_cast<uint64_t*>(subtensor_buffer)[n * subtensor_dim[1] * subtensor_dim[2] * subtensor_dim[3] + c * subtensor_dim[2] * subtensor_dim[3] + h * subtensor_dim[3] + w];
+                        MMU.store_uint64(s_addr, val);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Zero padding
+for (int vlane_idx=used_vlane; vlane_idx<n_vu; vlane_idx++) {
+    for (n=0; n<subtensor_dim[0]; n++) {
+        for (c=0; c<subtensor_dim[1]; c++) {
+            for (h=0; h<subtensor_dim[2]; h++) {
+                for (w=0; w<subtensor_dim[3]; w++) {
+                    reg_t s_offset = (n * subtensor_stride[0] + c * subtensor_stride[1] + h * subtensor_stride[2] + w * subtensor_stride[3]) * element_size;
+                    reg_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
+                    if (element_size == 1) {
+                        MMU.store_uint8(s_addr, 0);
+                    } else if (element_size == 2) {
+                        MMU.store_uint16(s_addr, 0);
+                    } else if (element_size == 4) {
+                        MMU.store_uint32(s_addr, 0);
+                    } else if (element_size == 8) {
+                        MMU.store_uint64(s_addr, 0);
                     }
                 }
             }
@@ -231,3 +291,4 @@ for (int outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++){
 }
 
 delete [] dma_buffer;
+delete [] subtensor_buffer;
