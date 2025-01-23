@@ -44,8 +44,8 @@ P.VU.dma_vlane_stride = RS2 >> 32;
 
 if (debug_flag) {
   printf("======== CONFIG =========\n");
-  printf("RS1: %llx\n", RS1);
-  printf("RS2: %llx\n", RS2);
+  printf("RS1: %lx\n", RS1);
+  printf("RS2: %lx\n", RS2);
 
   printf("dim_size = (%ld, %ld, %ld, %ld)\n", P.VU.dma_dim_size[0], P.VU.dma_dim_size[1], P.VU.dma_dim_size[2], P.VU.dma_dim_size[3]);
   printf("element_size = %ld\n", P.VU.dma_element_size);

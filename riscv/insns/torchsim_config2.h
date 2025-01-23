@@ -21,7 +21,7 @@ P.VU.dma_mm_stride[3] = RS2 & 0xFFFFFFFF;
 
 if (debug_flag) {
   printf("======== CONFIG2 =========\n");
-  printf("RS1: %llx\n", RS1);
-  printf("RS2: %llx\n", RS2);
+  printf("RS1: %lx\n", RS1);
+  printf("RS2: %lx\n", RS2);
   printf("mm_stride = (%ld, %ld, %ld, %ld)\n", P.VU.dma_mm_stride[0], P.VU.dma_mm_stride[1], P.VU.dma_mm_stride[2], P.VU.dma_mm_stride[3]);
 }
