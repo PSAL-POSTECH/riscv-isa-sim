@@ -43,12 +43,8 @@ block_dim[vlane_split_axis] = vlane_stride;
 
 uint64_t block_stride[4] = {p_spad_stride[N], p_spad_stride[C], p_spad_stride[H], p_spad_stride[W]};
 for (int i=0; i<4; i++) {
-    if (block_stride[i] > p_spad_stride[vlane_split_axis]) {
-        if (block_stride[vlane_split_axis] < n_vu)
-            block_stride[i] = ROUNDUP(block_stride[i], used_vlane) / used_vlane;
-        else
-            block_stride[i] = ROUNDUP(block_stride[i], n_vu/vlane_stride) / (n_vu/vlane_stride);
-    }
+    if (block_stride[i] > p_spad_stride[vlane_split_axis])
+        block_stride[i] = (block_stride[i] / p_dim_size[vlane_split_axis]) * vlane_stride;
 }
 
 uint64_t buffer_size = ROUNDUP(p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3], used_vlane * block_dim[N] * block_dim[C] * block_dim[H] * block_dim[W]);
@@ -76,7 +72,7 @@ try {
 }
 
 if (debug_flag) {
-    printf("=============== MVIN ===============\n");
+    printf("=============== MVOUT ===============\n");
     printf("Instruction configs:\n");
     printf("- dramAddr: 0x%lx\n", dramAddr);
     printf("- scratchpadAddr: 0x%lx\n", scratchpadAddr);
