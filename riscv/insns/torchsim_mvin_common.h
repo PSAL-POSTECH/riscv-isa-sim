@@ -7,6 +7,7 @@
 #define H 2
 #define W 3
 
+#define ROUNDUP(X, Y) (((X) + (Y) - 1) / (Y) * (Y))
 
 const char* debug_env = std::getenv("SPIKE_DEBUG");
 const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
@@ -34,8 +35,42 @@ else if (vlane_split_axis == W)
 else
     assert(0);
 
+uint64_t used_vlane = n_outerloop > 1 ? n_vu : (p_dim_size[vlane_split_axis] + vlane_stride - 1) / vlane_stride;
+
+reg_t block_dim[4] = {p_dim_size[N], p_dim_size[C], p_dim_size[H], p_dim_size[W]};
+block_dim[vlane_split_axis] = vlane_stride;
+
+reg_t block_stride[4] = {p_spad_stride[N], p_spad_stride[C], p_spad_stride[H], p_spad_stride[W]};
+for (int i=0; i<4; i++) {
+    if (block_stride[i] > p_spad_stride[vlane_split_axis])
+        if (block_stride[vlane_split_axis] < n_vu)
+            block_stride[i] = ROUNDUP(block_stride[i], used_vlane) / used_vlane;
+        else
+            block_stride[i] = ROUNDUP(block_stride[i], n_vu/vlane_stride) / (n_vu/vlane_stride);
+}
+
+uint64_t buffer_size = ROUNDUP(p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3], used_vlane * block_dim[N] * block_dim[C] * block_dim[H] * block_dim[W]);
+uint64_t dma_buffer_stride[4] = {p_dim_size[C] * p_dim_size[H] * p_dim_size[W], p_dim_size[H] * p_dim_size[W], p_dim_size[W], 1};
+
+uint64_t d_vlane_idx_stride = dma_buffer_stride[vlane_split_axis] * vlane_stride;
+uint64_t d_outerloop_idx_stride = d_vlane_idx_stride * used_vlane;
+uint64_t s_outerloop_idx_stride = block_stride[vlane_split_axis] * vlane_stride;
+
+void *dma_buffer = nullptr;
+if (element_size == 1)
+    dma_buffer = new uint8_t[buffer_size];
+else if (element_size == 2)
+    dma_buffer = new uint16_t[buffer_size];
+else if (element_size == 4)
+    dma_buffer = new uint32_t[buffer_size];
+else if (element_size == 8)
+    dma_buffer = new uint64_t[buffer_size];
+else
+    assert(0);
+
 if (debug_flag) {
     printf("=============== MVIN ===============\n");
+    printf("Instruction configs:\n");
     printf("- dramAddr: 0x%lx\n", dramAddr);
     printf("- scratchpadAddr: 0x%lx\n", scratchpadAddr);
     printf("- p_dim_size: (%ld, %ld, %ld, %ld)\n", p_dim_size[0], p_dim_size[1], p_dim_size[2], p_dim_size[3]);
@@ -45,24 +80,22 @@ if (debug_flag) {
     printf("- vlane_stride: %ld\n", vlane_stride);
     printf("- vlane_split_axis: %d\n", vlane_split_axis);
     printf("- Outer loop: %d\n", n_outerloop);
+
+    printf("DMA buffer configs:\n");
+    printf("- dma buffer size: %ld\n", buffer_size);
+    printf("- dma buffer stride: (%ld, %ld, %ld, %ld)\n", dma_buffer_stride[0], dma_buffer_stride[1], dma_buffer_stride[2], dma_buffer_stride[3]);
+
+    printf("Block configs:\n");
+    printf("- block_dim: (%ld, %ld, %ld, %ld)\n", block_dim[N], block_dim[C], block_dim[H], block_dim[W]);
+    printf("- block_stride: (%ld, %ld, %ld, %ld)\n", block_stride[N], block_stride[C], block_stride[H], block_stride[W]);
+    printf("- used_vlane: %ld\n", used_vlane);
+    printf("- d_vlane_idx_stride: %ld\n", d_vlane_idx_stride);
+    printf("- d_outerloop_idx_stride: %ld\n", d_outerloop_idx_stride);
+    printf("- s_outerloop_idx_stride: %ld\n", s_outerloop_idx_stride);
 }
 
 assert(element_size > 0);
 assert(vlane_stride > 0);
-
-void *dma_buffer = nullptr;
-if (element_size == 1)
-    dma_buffer = new uint8_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
-else if (element_size == 2)
-    dma_buffer = new uint16_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
-else if (element_size == 4)
-    dma_buffer = new uint32_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
-else if (element_size == 8)
-    dma_buffer = new uint64_t[p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]];
-else
-    assert(0);
-
-reg_t dma_buffer_stride[4] = {p_dim_size[C] * p_dim_size[H] * p_dim_size[W], p_dim_size[H] * p_dim_size[W], p_dim_size[W], 1};
 
 if (debug_flag) {
     printf("Load data from mm:\n");
@@ -104,32 +137,9 @@ if (debug_flag) {
     printf("\n");
 }
 
-reg_t block_dim[4] = {p_dim_size[N], p_dim_size[C], p_dim_size[H], p_dim_size[W]};
-block_dim[vlane_split_axis] = vlane_stride;
-
-reg_t block_stride[4] = {p_spad_stride[N], p_spad_stride[C], p_spad_stride[H], p_spad_stride[W]};
-for (int i=0; i<4; i++) {
-    if (block_stride[i] > p_spad_stride[vlane_split_axis])
-        block_stride[i] /= n_vu / vlane_stride;
-}
-
-reg_t used_vlane = n_outerloop > 1 ? n_vu : (p_dim_size[vlane_split_axis] + vlane_stride - 1) / vlane_stride;
-reg_t d_vlane_idx_stride = dma_buffer_stride[vlane_split_axis] * vlane_stride;
-reg_t d_outerloop_idx_stride = d_vlane_idx_stride * used_vlane;
-reg_t s_outerloop_idx_stride = block_stride[vlane_split_axis] * vlane_stride;
-
-if (debug_flag) {
-    printf("block_dim: (%ld, %ld, %ld, %ld)\n", block_dim[N], block_dim[C], block_dim[H], block_dim[W]);
-    printf("block_stride: (%ld, %ld, %ld, %ld)\n", block_stride[N], block_stride[C], block_stride[H], block_stride[W]);
-    printf("used_vlane: %ld\n", used_vlane);
-    printf("d_vlane_idx_stride: %ld\n", d_vlane_idx_stride);
-    printf("d_outerloop_idx_stride: %ld\n", d_outerloop_idx_stride);
-    printf("s_outerloop_idx_stride: %ld\n", s_outerloop_idx_stride);
-}
-
+// Store data to spad by block_stride
 for (int outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
-    // for (int vlane_idx=0; vlane_idx<used_vlane; vlane_idx++) {
-        for (int vlane_idx=0; vlane_idx<n_vu; vlane_idx++) {
+    for (int vlane_idx=0; vlane_idx<n_vu; vlane_idx++) {
         for (int n=0; n<block_dim[N]; n++) {
             for (int c=0; c<block_dim[C]; c++) {
                 for (int h=0; h<block_dim[H]; h++) {
@@ -143,7 +153,7 @@ for (int outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                             val = static_cast<uint32_t*>(dma_buffer)[d_offset];
 
                         if (debug_flag) {
-                            printf("[Buffer -> Spad] outerloop_idx: %d, vlane_idx: %d, (%d, %d, %d, %d)\n", outerloop_idx, vlane_idx, n, c, h, w);
+                            printf("[Buffer -> Spad] outerloop_idx: %d, vlane_idx: %d, N: %d, C: %d, H: %d, W: %d\n", outerloop_idx, vlane_idx, n, c, h, w);
                             printf("- d_offset: %ld, s_offset: %ld, s_addr: 0x%lx\n", d_offset, s_offset/element_size, s_addr);
                             printf("val: %f\n", *(float *)&val);
                         }
