@@ -176,7 +176,7 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
   bool sp_changed = false;
   if (pc >= p->kernel_addr.first && pc < p->kernel_addr.second) {
     p->set_kernel_flag(true);
-    if (pc == p->kernel_addr.first) {
+    if (pc == p->kernel_addr.first && ((fetch.insn.bits() & MASK_C_LUI) == MATCH_C_LUI || (fetch.insn.bits() & MASK_ADDI) == MATCH_ADDI)) {
       int64_t (insn_t::*imm)();
       imm = fetch.insn.length() == 4 ? &insn_t::i_imm : &insn_t::rvc_addi16sp_imm;
       assert((fetch.insn.*imm)() < 0);
@@ -185,7 +185,6 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
     }
     if (fetch.insn.rd() == 2)
       sp_changed = true;
-
   } else {
     p->set_kernel_flag(false);
     if (pc == p->kernel_addr.second){
