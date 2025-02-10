@@ -44,7 +44,7 @@ block_dim[vlane_split_axis] = vlane_stride;
 uint64_t block_stride[4] = {p_spad_stride[N], p_spad_stride[C], p_spad_stride[H], p_spad_stride[W]};
 for (int i=0; i<4; i++) {
     if (block_stride[i] > p_spad_stride[vlane_split_axis])
-        block_stride[i] = (block_stride[i] / p_dim_size[vlane_split_axis]) * vlane_stride;
+        block_stride[i] = (block_stride[i] / p_dim_size[vlane_split_axis]) * vlane_stride * n_outerloop;
 }
 
 uint64_t buffer_size = ROUNDUP(p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3], used_vlane * block_dim[N] * block_dim[C] * block_dim[H] * block_dim[W]);
