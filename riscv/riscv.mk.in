@@ -132,6 +132,7 @@ riscv_insn_ext_i = \
 	torchsim_vpop \
 	torchsim_compute \
 	torchsim_vexp \
+	torchsim_verf \
 
 riscv_insn_ext_a = \
 	amoadd_d \
