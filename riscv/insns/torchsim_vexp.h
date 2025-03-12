@@ -1,7 +1,7 @@
 // torchsim_vexp
 
-const reg_t vs = insn.rs2();;
-const reg_t vd = insn.rd();;
+const reg_t vs = insn.rs2();
+const reg_t vd = insn.rd();
 const reg_t vl = P.VU.vl->read();
 const reg_t n_vu = P.VU.get_vu_num();
 const reg_t vstart = P.VU.vstart->read();
