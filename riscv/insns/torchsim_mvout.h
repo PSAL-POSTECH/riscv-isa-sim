@@ -109,6 +109,10 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                         uint64_t d_offset = d_outerloop_idx_stride * outerloop_idx + d_vlane_idx_stride * vlane_idx + dma_buffer_stride[N] * n + dma_buffer_stride[C] * c + dma_buffer_stride[H] * h + dma_buffer_stride[W] * w ;
                         uint64_t s_offset = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w) * element_size;
                         uint64_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
+                        if (scratchpadAddr + s_offset >= P.VU.sram_v_space.first + P.VU.vu_sram_byte) {
+                            fprintf(stderr, "MVOUT ERROR: Scratchpad address overflow: 0x%lx\n", s_addr);
+                            exit(-1);
+                        }
 
                         if (element_size == 1) {
                             uint8_t val = MMU.load_uint8(s_addr);
@@ -150,28 +154,28 @@ for (uint64_t n=0; n<p_dim_size[0]; n++) {
 
                 if (element_size == 1) {
                     uint8_t val = static_cast<uint8_t*>(dma_buffer)[buffer_idx];
-                    MMU.store_uint8(d_addr, val);
                     if (debug_flag) {
                         printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %x\n", d_addr, buffer_idx, *((char*)&val));
                     }
+                    MMU.store_uint8(d_addr, val);
                 } else if (element_size == 2) {
                     uint16_t val = static_cast<uint16_t*>(dma_buffer)[buffer_idx];
-                    MMU.store_uint16(d_addr, val);
                     if (debug_flag) {
                         printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %x\n", d_addr, buffer_idx, *((short*)&val));
                     }
+                    MMU.store_uint16(d_addr, val);
                 } else if (element_size == 4) {
                     uint32_t val = static_cast<uint32_t*>(dma_buffer)[buffer_idx];
-                    MMU.store_uint32(d_addr, val);
                     if (debug_flag) {
                         printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %f\n", d_addr, buffer_idx, *((float*)&val));
                     }
+                    MMU.store_uint32(d_addr, val);
                 } else if (element_size == 8) {
                     uint64_t val = static_cast<uint64_t*>(dma_buffer)[buffer_idx];
-                    MMU.store_uint64(d_addr, val);
                     if (debug_flag) {
                         printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %lf\n", d_addr, buffer_idx, *((double*)&val));
                     }
+                    MMU.store_uint64(d_addr, val);
                 }
             }
         }

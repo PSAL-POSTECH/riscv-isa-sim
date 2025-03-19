@@ -26,7 +26,8 @@
 processor_t::processor_t(const char* isa, const char* priv, const char* varch,
                          simif_t* sim, uint32_t id, bool halt_on_reset,
                          FILE* log_file, std::ostream& sout_, uint32_t n_vu,
-                         std::pair<reg_t, reg_t> vu_sram_space, std::pair<reg_t, reg_t> kernel_addr)
+                         std::pair<reg_t, reg_t> vu_sram_p_space, std::pair<reg_t, reg_t> vu_sram_v_space,
+                         std::pair<reg_t, reg_t> kernel_addr)
   : debug(false), halt_request(HR_NONE), sim(sim), id(id), xlen(0),
   histogram_enabled(false), log_commits_enabled(false), kernel_addr(kernel_addr),
   log_file(log_file), sout_(sout_.rdbuf()), n_vu(n_vu), halt_on_reset(halt_on_reset),
@@ -34,9 +35,11 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
 {
   VU.p = this;
   VU.n_vu = n_vu;
-  VU.sram_space = vu_sram_space;
+  VU.sram_p_space = vu_sram_p_space;
+  VU.sram_v_space = vu_sram_v_space;
   SA = new systolicArray_t(this, n_vu);
-
+  printf("VU sram_p_space > %lx %lx\n", vu_sram_p_space.first, vu_sram_p_space.second);
+  printf("VU sram_p_space > %lx %lx\n", vu_sram_v_space.first, vu_sram_v_space.second);
   parse_isa_string(isa);
   parse_priv_string(priv);
   parse_varch_string(varch);

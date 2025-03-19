@@ -281,7 +281,8 @@ public:
   processor_t(const char* isa, const char* priv, const char* varch,
               simif_t* sim, uint32_t id, bool halt_on_reset,
               FILE *log_file, std::ostream& sout_, uint32_t n_vu,
-              std::pair<reg_t, reg_t> vu_sram_space, std::pair<reg_t, reg_t> kernel_addr); // because of command line option --log and -s we need both
+              std::pair<reg_t, reg_t> vu_sram_p_space, std::pair<reg_t, reg_t> vu_sram_v_space,
+              std::pair<reg_t, reg_t> kernel_addr); // because of command line option --log and -s we need both
   ~processor_t();
 
   void set_debug(bool value);
@@ -546,7 +547,8 @@ public:
       bool vill;
       bool vstart_alu;
       reg_t n_vu;
-      std::pair<reg_t, reg_t> sram_space;
+      std::pair<reg_t, reg_t> sram_p_space;
+      std::pair<reg_t, reg_t> sram_v_space;
 
       // Config called for every dma operation
       reg_t dma_dim_size[4] = {0, 0, 0, 0};

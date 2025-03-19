@@ -94,11 +94,12 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
       exit(1);
   }
 
-  std::pair<reg_t, reg_t> vu_sram_space = std::make_pair(scratchpad_base_paddr, scratchpad_base_paddr+scratchpad_size);
+  std::pair<reg_t, reg_t> vu_sram_p_space = std::make_pair(scratchpad_base_paddr, scratchpad_base_paddr+scratchpad_size);
+  std::pair<reg_t, reg_t> vu_sram_v_space = std::make_pair(scratchpad_base_vaddr, scratchpad_base_vaddr+scratchpad_size);
   for (size_t i = 0; i < nprocs; i++) {
     int hart_id = hartids.empty() ? i : hartids[i];
     procs[i] = new processor_t(isa, priv, varch, this, hart_id, halted,
-                               log_file.get(), sout_, n_vu, vu_sram_space, kernel_addr);
+                               log_file.get(), sout_, n_vu, vu_sram_p_space, vu_sram_v_space, kernel_addr);
   }
 
   make_dtb();

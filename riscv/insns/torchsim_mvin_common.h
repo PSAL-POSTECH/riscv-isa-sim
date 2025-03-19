@@ -156,46 +156,49 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
             for (uint64_t c=0; c<block_dim[C]; c++) {
                 for (uint64_t h=0; h<block_dim[H]; h++) {
                     for (uint64_t w=0; w<block_dim[W]; w++) {
-                        reg_t d_offset = d_outerloop_idx_stride * outerloop_idx + d_vlane_idx_stride * vlane_idx + dma_buffer_stride[N] * n + dma_buffer_stride[C] * c + dma_buffer_stride[H] * h + dma_buffer_stride[W] * w ;
-                        reg_t s_offset = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w) * element_size;
-                        reg_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
-
+                        uint64_t d_offset = d_outerloop_idx_stride * outerloop_idx + d_vlane_idx_stride * vlane_idx + dma_buffer_stride[N] * n + dma_buffer_stride[C] * c + dma_buffer_stride[H] * h + dma_buffer_stride[W] * w ;
+                        uint64_t s_offset = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w) * element_size;
+                        uint64_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
+                        if (scratchpadAddr + s_offset >= P.VU.sram_v_space.first + P.VU.vu_sram_byte) {
+                            fprintf(stderr, "MVIN ERROR: Scratchpad address overflow: 0x%lx\n", s_addr);
+                            exit(-1);
+                        }
                         if (element_size == 1) {
                             uint8_t val = 0;
                             if (vlane_idx < used_vlane)
                                 val = static_cast<uint8_t*>(dma_buffer)[d_offset];
-                            MMU.store_uint8(s_addr, val);
                             if (debug_flag) {
                                 printf("[Buffer -> Spad] outerloop_idx: %ld, vlane_idx: %ld, N: %ld, C: %ld, H: %ld, W: %ld\n", outerloop_idx, vlane_idx, n, c, h, w);
                                 printf("- Buffer_idx: %ld, SPAD_ADDR: %lx, Val: %x\n", d_offset, s_addr, *((char*)&val));
                             }
+                            MMU.store_uint8(s_addr, val);
                         } else if (element_size == 2) {
                             uint16_t val = 0;
                             if (vlane_idx < used_vlane)
                                 val = static_cast<uint16_t*>(dma_buffer)[d_offset];
-                            MMU.store_uint16(s_addr, val);
                             if (debug_flag) {
                                 printf("[Buffer -> Spad] outerloop_idx: %ld, vlane_idx: %ld, N: %ld, C: %ld, H: %ld, W: %ld\n", outerloop_idx, vlane_idx, n, c, h, w);
                                 printf("- Buffer_idx: %ld, SPAD_ADDR: %lx, Val: %x\n", d_offset, s_addr, *((short*)&val));
                             }
+                            MMU.store_uint16(s_addr, val);
                         } else if (element_size == 4) {
                             uint32_t val = 0;
                             if (vlane_idx < used_vlane)
                                 val = static_cast<uint32_t*>(dma_buffer)[d_offset];
-                            MMU.store_uint32(s_addr, val);
                             if (debug_flag) {
                                 printf("[Buffer -> Spad] outerloop_idx: %ld, vlane_idx: %ld, N: %ld, C: %ld, H: %ld, W: %ld\n", outerloop_idx, vlane_idx, n, c, h, w);
                                 printf("- Buffer_idx: %ld, SPAD_ADDR: %lx, Val: %f\n", d_offset, s_addr, *((float*)&val));
                             }
+                            MMU.store_uint32(s_addr, val);
                         } else if (element_size == 8) {
                             uint64_t val = 0;
                             if (vlane_idx < used_vlane)
                                 val = static_cast<uint64_t*>(dma_buffer)[d_offset];
-                            MMU.store_uint64(s_addr, val);
                             if (debug_flag) {
                                 printf("[Buffer -> Spad] outerloop_idx: %ld, vlane_idx: %ld, N: %ld, C: %ld, H: %ld, W: %ld\n", outerloop_idx, vlane_idx, n, c, h, w);
                                 printf("- Buffer_idx: %ld, SPAD_ADDR: %lx, Val: %lf\n", d_offset, s_addr, *((double*)&val));
                             }
+                            MMU.store_uint64(s_addr, val);
                         }
                     }
                 }

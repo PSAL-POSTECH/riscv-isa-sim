@@ -1652,7 +1652,6 @@ reg_t index[P.VU.vlmax]; \
   const reg_t vl = is_mask_ldst ? ((P.VU.vl->read() + 7) / 8) : P.VU.vl->read(); \
   reg_t baseAddr = RS1; \
   const reg_t vd = insn.rd(); \
-  reg_t addr = 0; \
   VI_CHECK_LOAD(elt_width, is_mask_ldst); \
   const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   const reg_t vstart = P.VU.vstart->read(); \
@@ -1668,7 +1667,11 @@ reg_t index[P.VU.vlmax]; \
       VI_ELEMENT_SKIP(i); \
       VI_STRIP(i); \
       for (reg_t fn = 0; fn < nf; ++fn) { \
-        addr = baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t); \
+        uint64_t addr = baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t); \
+        if (P.get_kernel_flag() && (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte)) { \
+          printf("VI_LD ERROR: Access address overflow: 0x%lx\n", addr); \
+          exit(-1); \
+        } \
         elt_width##_t val = MMU.load_##elt_width(addr); \
         P.VU.elt<elt_width##_t>(vd + fn * emul, vreg_inx, vu_idx, true) = val; \
       } \
@@ -1737,6 +1740,11 @@ reg_t index[P.VU.vlmax]; \
       VI_ELEMENT_SKIP(i); \
       P.VU.vstart->write(i); \
       for (reg_t fn = 0; fn < nf; ++fn) { \
+        uint64_t addr = baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t); \
+        if (P.get_kernel_flag() && (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte)) { \
+          printf("VI_ST ERROR: Access address overflow: 0x%lx\n", addr); \
+          exit(-1); \
+        } \
         elt_width##_t val = P.VU.elt<elt_width##_t>(vs3 + fn * emul, vreg_inx, vu_idx); \
         MMU.store_##elt_width( \
           baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t), val); \
