@@ -39,7 +39,7 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
   VU.sram_v_space = vu_sram_v_space;
   SA = new systolicArray_t(this, n_vu);
   printf("VU sram_p_space > %lx %lx\n", vu_sram_p_space.first, vu_sram_p_space.second);
-  printf("VU sram_p_space > %lx %lx\n", vu_sram_v_space.first, vu_sram_v_space.second);
+  printf("VU sram_v_space > %lx %lx\n", vu_sram_v_space.first, vu_sram_v_space.second);
   parse_isa_string(isa);
   parse_priv_string(priv);
   parse_varch_string(varch);

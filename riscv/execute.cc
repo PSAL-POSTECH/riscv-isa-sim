@@ -176,6 +176,8 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
   bool sp_changed = false;
   if (pc >= p->kernel_addr.first && pc < p->kernel_addr.second) {
     p->set_kernel_flag(true);
+
+    // Adjust kernel stack pointer for LUI and ADDI instructions at the beginning of the kernel
     if (pc == p->kernel_addr.first && ((fetch.insn.bits() & MASK_C_LUI) == MATCH_C_LUI || (fetch.insn.bits() & MASK_ADDI) == MATCH_ADDI)) {
       int64_t (insn_t::*imm)();
       imm = fetch.insn.length() == 4 ? &insn_t::i_imm : &insn_t::rvc_addi16sp_imm;
@@ -183,6 +185,18 @@ static inline reg_t execute_insn(processor_t* p, reg_t pc, insn_fetch_t fetch)
       p->set_kernel_sb(p->get_state()->XPR[2]);
       p->set_kernel_sp(p->get_state()->XPR[2] + (fetch.insn.*imm)());
     }
+
+    // Adjust kernel stack pointer for ADD/SUB instruction
+    if ((fetch.insn.bits() & MASK_C_ADD) == MATCH_C_ADD && fetch.insn.rd() == 2){
+      printf("[SPIKE] Found stack pointer subtract instruction at PC 0x%lx\n", pc);
+      printf("Adding stack pointer by %ld\n", p->get_state()->XPR[10]);
+      p->set_kernel_sp(p->get_state()->XPR[2] - p->get_state()->XPR[10]);
+    } else if ((fetch.insn.bits() & MASK_SUB) == MATCH_SUB && fetch.insn.rd() == 2) {
+      printf("[SPIKE] Found stack pointer subtract instruction at PC 0x%lx\n", pc);
+      printf("Subtracting stack pointer by %ld\n", p->get_state()->XPR[10]);
+      p->set_kernel_sp(p->get_state()->XPR[2] + p->get_state()->XPR[10]);
+    }
+
     if (fetch.insn.rd() == 2)
       sp_changed = true;
   } else {
