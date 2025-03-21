@@ -23,6 +23,7 @@ const reg_t *p_spad_stride = P.VU.dma_spad_stride;
 const reg_t element_size = P.VU.dma_element_size;
 const reg_t vlane_stride = P.VU.dma_vlane_stride;
 const int vlane_split_axis = P.VU.dma_vlane_split_axis;
+const bool indirect_mode = P.VU.dma_indirect_mode;
 uint64_t n_outerloop = 1;
 
 if (vlane_split_axis == N)
@@ -56,16 +57,7 @@ uint64_t s_outerloop_idx_stride = block_stride[vlane_split_axis] * vlane_stride;
 
 void *dma_buffer = nullptr;
 try {
-    if (element_size == 1)
-        dma_buffer = new uint8_t[buffer_size];
-    else if (element_size == 2)
-        dma_buffer = new uint16_t[buffer_size];
-    else if (element_size == 4)
-        dma_buffer = new uint32_t[buffer_size];
-    else if (element_size == 8)
-        dma_buffer = new uint64_t[buffer_size];
-    else
-        assert(false && "Unsupported element size");
+    dma_buffer = new uint64_t[buffer_size];
 } catch (const std::bad_alloc& e) {
     std::cerr << "Memory allocation failed: " << e.what() << std::endl;
     assert(false);
@@ -76,6 +68,7 @@ if (debug_flag) {
     printf("Instruction configs:\n");
     printf("- dramAddr: 0x%lx\n", dramAddr);
     printf("- scratchpadAddr: 0x%lx\n", scratchpadAddr);
+    printf("- indirect mode: %d\n", indirect_mode);
     printf("- p_dim_size: (%ld, %ld, %ld, %ld)\n", p_dim_size[0], p_dim_size[1], p_dim_size[2], p_dim_size[3]);
     printf("- p_mm_stride: (%ld, %ld, %ld, %ld)\n", p_mm_stride[0], p_mm_stride[1], p_mm_stride[2], p_mm_stride[3]);
     printf("- p_spad_stride: (%ld, %ld, %ld, %ld)\n", p_spad_stride[0], p_spad_stride[1], p_spad_stride[2], p_spad_stride[3]);
@@ -100,50 +93,7 @@ if (debug_flag) {
 assert(element_size > 0);
 assert(vlane_stride > 0);
 
-for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
-    for (uint64_t vlane_idx=0; vlane_idx<used_vlane; vlane_idx++) {
-        for (uint64_t n=0; n<block_dim[N]; n++) {
-            for (uint64_t c=0; c<block_dim[C]; c++) {
-                for (uint64_t h=0; h<block_dim[H]; h++) {
-                    for (uint64_t w=0; w<block_dim[W]; w++) {
-                        uint64_t d_offset = d_outerloop_idx_stride * outerloop_idx + d_vlane_idx_stride * vlane_idx + dma_buffer_stride[N] * n + dma_buffer_stride[C] * c + dma_buffer_stride[H] * h + dma_buffer_stride[W] * w ;
-                        uint64_t s_offset = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w) * element_size;
-                        uint64_t s_addr = scratchpadAddr + s_offset + vlane_idx * P.VU.vu_sram_byte;
-                        if (scratchpadAddr + s_offset >= P.VU.sram_v_space.first + P.VU.vu_sram_byte) {
-                            fprintf(stderr, "MVOUT ERROR: Scratchpad address overflow: 0x%lx\n", s_addr);
-                            exit(-1);
-                        }
-
-                        if (element_size == 1) {
-                            uint8_t val = MMU.load_uint8(s_addr);
-                            static_cast<uint8_t*>(dma_buffer)[d_offset] = val;
-                        } else if (element_size == 2) {
-                            uint16_t val = MMU.load_uint16(s_addr);
-                            static_cast<uint16_t*>(dma_buffer)[d_offset] = val;
-                        } else if (element_size == 4) {
-                            uint32_t val = MMU.load_uint32(s_addr);
-                            static_cast<uint32_t*>(dma_buffer)[d_offset] = val;
-                        } else if (element_size == 8) {
-                            uint64_t val = MMU.load_uint64(s_addr);
-                            static_cast<uint64_t*>(dma_buffer)[d_offset] = val;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// print dma_buffer
-if (debug_flag) {
-    printf("[[ MVOUT TENSOR ]]\n");
-    for (uint64_t i=0; i<p_dim_size[0] * p_dim_size[1] * p_dim_size[2] * p_dim_size[3]; i++) {
-        printf("%f ", *(float *)&(static_cast<uint32_t*>(dma_buffer)[i]));
-    }
-    printf("\n");
-}
-
-// Store data to memory by mm_stride
+// Record target dram address in dma_buffer
 for (uint64_t n=0; n<p_dim_size[0]; n++) {
     for (uint64_t c=0; c<p_dim_size[1]; c++) {
         for (uint64_t h=0; h<p_dim_size[2]; h++) {
@@ -151,31 +101,82 @@ for (uint64_t n=0; n<p_dim_size[0]; n++) {
                 uint64_t d_offset = (n * p_mm_stride[0] + c * p_mm_stride[1] + h * p_mm_stride[2] + w * p_mm_stride[3]) * element_size;
                 uint64_t d_addr = dramAddr + d_offset;
                 uint64_t buffer_idx = n * p_dim_size[1] * p_dim_size[2] * p_dim_size[3] + c * p_dim_size[2] * p_dim_size[3] + h * p_dim_size[3] + w;
+                static_cast<uint64_t*>(dma_buffer)[buffer_idx] = d_addr;
+            }
+        }
+    }
+}
 
-                if (element_size == 1) {
-                    uint8_t val = static_cast<uint8_t*>(dma_buffer)[buffer_idx];
-                    if (debug_flag) {
-                        printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %x\n", d_addr, buffer_idx, *((char*)&val));
+for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
+    for (uint64_t vlane_idx=0; vlane_idx<used_vlane; vlane_idx++) {
+        for (uint64_t n=0; n<block_dim[N]; n++) {
+            for (uint64_t c=0; c<block_dim[C]; c++) {
+                for (uint64_t h=0; h<block_dim[H]; h++) {
+                    for (uint64_t w=0; w<block_dim[W]; w++) {
+                        uint64_t d_idx = d_outerloop_idx_stride * outerloop_idx + d_vlane_idx_stride * vlane_idx + dma_buffer_stride[N] * n + dma_buffer_stride[C] * c + dma_buffer_stride[H] * h + dma_buffer_stride[W] * w ;
+                        uint64_t s_idx = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w);
+                        uint64_t s_addr = scratchpadAddr + s_idx * element_size + vlane_idx * P.VU.vu_sram_byte;
+                        uint64_t d_addr = static_cast<uint64_t*>(dma_buffer)[d_idx];
+                        if (scratchpadAddr + s_idx * element_size >= P.VU.sram_v_space.first + P.VU.vu_sram_byte) {
+                            fprintf(stderr, "MVOUT ERROR: Scratchpad address overflow: 0x%lx\n", s_addr);
+                            exit(-1);
+                        }
+
+                        if (debug_flag)
+                            printf("[MOVOUT] outerloop_idx: %ld, vlane_idx: %ld, N: %ld, C: %ld, H: %ld, W: %ld\n", outerloop_idx, vlane_idx, n, c, h, w);
+
+                        if (indirect_mode) {
+                            uint64_t indirect_base_addr = P.VU.dma_indirect_addr;
+                            uint64_t indirect_stride = P.VU.dma_indirect_stride;
+                            uint64_t indirect_element_size = P.VU.dma_indirect_element_size;
+                            uint64_t indirect_addr = indirect_base_addr + s_idx * indirect_element_size + vlane_idx * P.VU.vu_sram_byte;
+                            uint64_t indirect_idx = 0;
+                            switch(indirect_element_size) {
+                            case 1:
+                                indirect_idx = MMU.load_uint8(indirect_addr);
+                                break;
+                            case 2:
+                                indirect_idx = MMU.load_uint16(indirect_addr);
+                                break;
+                            case 4:
+                                indirect_idx = MMU.load_uint32(indirect_addr);
+                                break;
+                            case 8:
+                                indirect_idx = MMU.load_uint64(indirect_addr);
+                                break;
+                            default:
+                                fprintf(stderr, "Unsupported index type\n");
+                                assert(false);
+                            }
+                            if (debug_flag) {
+                                printf("[Indirect index] Base : 0x%lx, stride: %ld, element_size: %ld, idx: %ld\n",
+                                        indirect_base_addr, indirect_stride, indirect_element_size, indirect_idx);
+                            }
+                            d_addr += indirect_idx * indirect_stride * element_size;
+                        }
+
+                        if (element_size == 1) {
+                            uint8_t val = MMU.load_uint8(s_addr);
+                            MMU.store_uint8(d_addr, val);
+                            if (debug_flag)
+                                printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %x\n", d_idx, d_addr, s_addr, *((char*)&val));
+                        } else if (element_size == 2) {
+                            uint16_t val = MMU.load_uint16(s_addr);
+                            MMU.store_uint16(d_addr, val);
+                            if (debug_flag)
+                                printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %x\n", d_idx, d_addr, s_addr, *((short*)&val));
+                        } else if (element_size == 4) {
+                            uint32_t val = MMU.load_uint32(s_addr);
+                            MMU.store_uint32(d_addr, val);
+                            if (debug_flag)
+                                printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %f\n", d_idx, d_addr, s_addr, *((float*)&val));
+                        } else if (element_size == 8) {
+                            uint64_t val = MMU.load_uint64(s_addr);
+                            MMU.store_uint64(d_addr, val);
+                            if (debug_flag)
+                                printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %f\n", d_idx, d_addr, s_addr, *((double*)&val));
+                        }
                     }
-                    MMU.store_uint8(d_addr, val);
-                } else if (element_size == 2) {
-                    uint16_t val = static_cast<uint16_t*>(dma_buffer)[buffer_idx];
-                    if (debug_flag) {
-                        printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %x\n", d_addr, buffer_idx, *((short*)&val));
-                    }
-                    MMU.store_uint16(d_addr, val);
-                } else if (element_size == 4) {
-                    uint32_t val = static_cast<uint32_t*>(dma_buffer)[buffer_idx];
-                    if (debug_flag) {
-                        printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %f\n", d_addr, buffer_idx, *((float*)&val));
-                    }
-                    MMU.store_uint32(d_addr, val);
-                } else if (element_size == 8) {
-                    uint64_t val = static_cast<uint64_t*>(dma_buffer)[buffer_idx];
-                    if (debug_flag) {
-                        printf("[Buffer -> DRAM] DRAM_ADDR: 0x%lx, Buffer_idx: %ld, Val: %lf\n", d_addr, buffer_idx, *((double*)&val));
-                    }
-                    MMU.store_uint64(d_addr, val);
                 }
             }
         }
@@ -183,14 +184,6 @@ for (uint64_t n=0; n<p_dim_size[0]; n++) {
 }
 
 if (dma_buffer != nullptr) {
-    if (element_size == 1)
-        delete [] static_cast<uint8_t*>(dma_buffer);
-    else if (element_size == 2)
-        delete [] static_cast<uint16_t*>(dma_buffer);
-    else if (element_size == 4)
-        delete [] static_cast<uint32_t*>(dma_buffer);
-    else if (element_size == 8)
-        delete [] static_cast<uint64_t*>(dma_buffer);
-
+    delete [] static_cast<uint64_t*>(dma_buffer);
     dma_buffer = nullptr;
 }

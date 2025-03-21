@@ -41,6 +41,7 @@ P.VU.dma_dim_size[3] = RS1 & 0xFFFF;
 P.VU.dma_element_size = RS2 & ((1ULL << 14) - 1);
 P.VU.dma_vlane_split_axis = (RS2 >> 14) & 0b11;
 P.VU.dma_vlane_stride = RS2 >> 32;
+P.VU.dma_indirect_mode = (RS2 >> 16) & 0b1;
 
 if (debug_flag) {
   printf("======== CONFIG =========\n");
@@ -51,4 +52,5 @@ if (debug_flag) {
   printf("element_size = %ld\n", P.VU.dma_element_size);
   printf("vlane_split_axis = %d\n", P.VU.dma_vlane_split_axis);
   printf("vlane_stride = %ld\n", P.VU.dma_vlane_stride);
+  printf("indirect_mode = %d\n", P.VU.dma_indirect_mode);
 }

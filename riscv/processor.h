@@ -556,6 +556,11 @@ public:
       reg_t dma_spad_stride[4] = {0, 0, 0, 0};
       reg_t dma_element_size = 0;
       reg_t dma_vlane_stride = 0;
+      // For indirect access
+      bool dma_indirect_mode = false;
+      reg_t dma_indirect_addr = 0;
+      reg_t dma_indirect_stride = 0;
+      reg_t dma_indirect_element_size = 1;
 
       int dma_vlane_split_axis;
 
