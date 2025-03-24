@@ -118,9 +118,9 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                     for (uint64_t w=0; w<block_dim[W]; w++) {
                         reg_t d_idx = d_outerloop_idx_stride * outerloop_idx + d_vlane_idx_stride * vlane_idx + dma_buffer_stride[N] * n + dma_buffer_stride[C] * c + dma_buffer_stride[H] * h + dma_buffer_stride[W] * w ;
                         reg_t s_idx = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w);
-                        uint64_t s_addr = scratchpadAddr + s_idx * element_size + vlane_idx * P.VU.vu_sram_byte;
-                        uint64_t d_addr = static_cast<uint64_t*>(dma_buffer)[d_idx];
                         bool is_used_vlane = vlane_idx < used_vlane;
+                        uint64_t s_addr = scratchpadAddr + s_idx * element_size + vlane_idx * P.VU.vu_sram_byte;
+                        uint64_t d_addr = is_used_vlane ? static_cast<uint64_t*>(dma_buffer)[d_idx] : 0;
 
                         if (scratchpadAddr + s_idx * element_size >= P.VU.sram_v_space.first + P.VU.vu_sram_byte) {
                             fprintf(stderr, "MVIN ERROR: Scratchpad address overflow: 0x%lx\n", s_addr);
@@ -154,8 +154,8 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                                 assert(false);
                             }
                             if (debug_flag) {
-                                printf("[Indirect index] Base : 0x%lx, stride: %ld, element_size: %ld, idx: %ld\n",
-                                        indirect_base_addr, indirect_stride, indirect_element_size, indirect_idx);
+                                printf("[Indirect index] Base : 0x%lx, addr:0x%lx, stride: %ld, element_size: %ld, idx: %ld\n",
+                                        indirect_base_addr, indirect_addr, indirect_stride, indirect_element_size, indirect_idx);
                             }
                             d_addr += indirect_idx * indirect_stride * element_size;
                         }
