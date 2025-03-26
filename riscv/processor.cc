@@ -27,11 +27,11 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
                          simif_t* sim, uint32_t id, bool halt_on_reset,
                          FILE* log_file, std::ostream& sout_, uint32_t n_vu,
                          std::pair<reg_t, reg_t> vu_sram_p_space, std::pair<reg_t, reg_t> vu_sram_v_space,
-                         std::pair<reg_t, reg_t> kernel_addr)
+                         std::pair<reg_t, reg_t> kernel_addr, const char* base_path)
   : debug(false), halt_request(HR_NONE), sim(sim), id(id), xlen(0),
   histogram_enabled(false), log_commits_enabled(false), kernel_addr(kernel_addr),
   log_file(log_file), sout_(sout_.rdbuf()), n_vu(n_vu), halt_on_reset(halt_on_reset),
-  extension_table(256, false), impl_table(256, false), last_pc(1), executions(1)
+  extension_table(256, false), impl_table(256, false), last_pc(1), executions(1), base_path(base_path)
 {
   VU.p = this;
   VU.n_vu = n_vu;

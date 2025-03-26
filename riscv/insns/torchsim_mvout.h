@@ -9,6 +9,8 @@
 #define W 3
 
 #define ROUNDUP(X, Y) (((X) + (Y) - 1) / (Y) * (Y))
+static int indirect_counter;
+std::map<uint64_t, uint64_t> indirect_map;
 
 const char* debug_env = std::getenv("SPIKE_DEBUG");
 const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
@@ -117,6 +119,7 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                         uint64_t s_idx = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w);
                         uint64_t s_addr = scratchpadAddr + s_idx * element_size + vlane_idx * P.VU.vu_sram_byte;
                         uint64_t d_addr = static_cast<uint64_t*>(dma_buffer)[d_idx];
+
                         if (scratchpadAddr + s_idx * element_size >= P.VU.sram_v_space.first + P.VU.vu_sram_byte) {
                             fprintf(stderr, "MVOUT ERROR: Scratchpad address overflow: 0x%lx\n", s_addr);
                             exit(-1);
@@ -152,6 +155,7 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                                 printf("[Indirect index] Base : 0x%lx, stride: %ld, element_size: %ld, idx: %ld\n",
                                         indirect_base_addr, indirect_stride, indirect_element_size, indirect_idx);
                             }
+                            indirect_map[d_idx] = indirect_idx;
                             d_addr += indirect_idx * indirect_stride * element_size;
                         }
 
@@ -186,4 +190,17 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
 if (dma_buffer != nullptr) {
     delete [] static_cast<uint64_t*>(dma_buffer);
     dma_buffer = nullptr;
+}
+
+if (P.VU.dma_indirect_mode) {
+    std::string file_path = std::string(P.base_path) + "/indirect_access/indirect_index" + std::to_string(P.VU.dma_indirect_counter++) + ".raw";
+    FILE* fp = fopen(file_path.c_str(), "wb");
+    if (!fp) {
+        fprintf(stderr, "Failed to open file for writing: %s\n", file_path);
+    } else {
+        for (size_t i = 0; i < indirect_map.size(); ++i) {
+            fwrite(&(indirect_map[i]), sizeof(uint64_t), 1, fp);
+        }
+        fclose(fp);
+    }
 }

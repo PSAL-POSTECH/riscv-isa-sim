@@ -282,7 +282,7 @@ public:
               simif_t* sim, uint32_t id, bool halt_on_reset,
               FILE *log_file, std::ostream& sout_, uint32_t n_vu,
               std::pair<reg_t, reg_t> vu_sram_p_space, std::pair<reg_t, reg_t> vu_sram_v_space,
-              std::pair<reg_t, reg_t> kernel_addr); // because of command line option --log and -s we need both
+              std::pair<reg_t, reg_t> kernel_addr, const char *base_path); // because of command line option --log and -s we need both
   ~processor_t();
 
   void set_debug(bool value);
@@ -561,6 +561,7 @@ public:
       reg_t dma_indirect_addr = 0;
       reg_t dma_indirect_stride = 0;
       reg_t dma_indirect_element_size = 1;
+      uint64_t dma_indirect_counter = 0;
 
       int dma_vlane_split_axis;
 
@@ -644,6 +645,7 @@ public:
 
   vectorUnit_t VU;
   systolicArray_t *SA;
+  const char *base_path;
 };
 
 reg_t illegal_instruction(processor_t* p, insn_t insn, reg_t pc);

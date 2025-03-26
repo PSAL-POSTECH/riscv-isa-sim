@@ -8,7 +8,6 @@
 #define W 3
 
 #define ROUNDUP(X, Y) (((X) + (Y) - 1) / (Y) * (Y))
-
 const char* debug_env = std::getenv("SPIKE_DEBUG");
 const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
 
@@ -23,6 +22,7 @@ const reg_t element_size = P.VU.dma_element_size;
 const reg_t vlane_stride = P.VU.dma_vlane_stride;
 const int vlane_split_axis = P.VU.dma_vlane_split_axis;
 const bool indirect_mode = P.VU.dma_indirect_mode;
+
 uint64_t n_outerloop = 1;
 
 if (vlane_split_axis == N)
@@ -130,7 +130,7 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                         if (debug_flag && is_used_vlane)
                             printf("[MOVIN] outerloop_idx: %ld, vlane_idx: %ld, N: %ld, C: %ld, H: %ld, W: %ld\n", outerloop_idx, vlane_idx, n, c, h, w);
 
-                        if (indirect_mode) {
+                        if (indirect_mode && is_used_vlane) {
                             uint64_t indirect_base_addr = P.VU.dma_indirect_addr;
                             uint64_t indirect_stride = P.VU.dma_indirect_stride;
                             uint64_t indirect_element_size = P.VU.dma_indirect_element_size;
@@ -157,6 +157,7 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                                 printf("[Indirect index] Base : 0x%lx, addr:0x%lx, stride: %ld, element_size: %ld, idx: %ld\n",
                                         indirect_base_addr, indirect_addr, indirect_stride, indirect_element_size, indirect_idx);
                             }
+                            indirect_map[d_idx] = indirect_idx;
                             d_addr += indirect_idx * indirect_stride * element_size;
                         }
 

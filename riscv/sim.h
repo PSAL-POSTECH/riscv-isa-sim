@@ -43,7 +43,7 @@ public:
         boost::asio::io_service *io_service_ptr_ctor, boost::asio::ip::tcp::acceptor *acceptor_ptr_ctor,  // option -s
 #endif
         FILE *cmd_file, uint64_t scratchpad_base_paddr, uint64_t scratchpad_base_vaddr,
-        uint64_t scratchpad_size, uint32_t n_vu, std::pair<reg_t, reg_t> kernel_addr);
+        uint64_t scratchpad_size, uint32_t n_vu, std::pair<reg_t, reg_t> kernel_addr, const char* base_path);
   ~sim_t();
 
   // run the simulation to completion
@@ -179,6 +179,7 @@ public:
   // enumerate processors, which segfaults if procs hasn't been initialized
   // yet.
   debug_module_t debug_module;
+  const char* base_path;
 };
 
 extern volatile bool ctrlc_pressed;
