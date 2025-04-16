@@ -31,7 +31,7 @@ int main(int argc, char** argv)
   std::pair<reg_t, reg_t> vu_sram_p_space = std::make_pair(0, 0);
   std::pair<reg_t, reg_t> vu_sram_v_space = std::make_pair(0, 0);
   std::pair<reg_t, reg_t> kernel_addr = std::make_pair(0, 0);
-  processor_t p(isa, DEFAULT_PRIV, DEFAULT_VARCH, 0, 0, false, nullptr, cerr, n_vu, vu_sram_p_space, vu_sram_v_space, kernel_addr, NULL);
+  processor_t p(isa, DEFAULT_PRIV, DEFAULT_VARCH, 0, 0, false, nullptr, cerr, n_vu, vu_sram_p_space, vu_sram_v_space, kernel_addr, 0, NULL);
   if (extension) {
     p.register_extension(extension());
   }

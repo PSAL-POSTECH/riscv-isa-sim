@@ -282,7 +282,7 @@ public:
               simif_t* sim, uint32_t id, bool halt_on_reset,
               FILE *log_file, std::ostream& sout_, uint32_t n_vu,
               std::pair<reg_t, reg_t> vu_sram_p_space, std::pair<reg_t, reg_t> vu_sram_v_space,
-              std::pair<reg_t, reg_t> kernel_addr, const char *base_path); // because of command line option --log and -s we need both
+              std::pair<reg_t, reg_t> kernel_addr, uint64_t scratchpad_size_per_vu, const char *base_path); // because of command line option --log and -s we need both
   ~processor_t();
 
   void set_debug(bool value);
@@ -566,7 +566,7 @@ public:
       int dma_vlane_split_axis;
 
       // VU SRAM
-      reg_t vu_sram_byte = 128 << 10;
+      reg_t vu_sram_byte = 0;
 
       // vector element for varies SEW
       template<class T>

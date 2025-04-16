@@ -100,7 +100,7 @@ sim_t::sim_t(const char* isa, const char* priv, const char* varch,
   for (size_t i = 0; i < nprocs; i++) {
     int hart_id = hartids.empty() ? i : hartids[i];
     procs[i] = new processor_t(isa, priv, varch, this, hart_id, halted,
-                               log_file.get(), sout_, n_vu, vu_sram_p_space, vu_sram_v_space, kernel_addr, base_path);
+                               log_file.get(), sout_, n_vu, vu_sram_p_space, vu_sram_v_space, kernel_addr, scratchpad_size, base_path);
   }
 
   make_dtb();
