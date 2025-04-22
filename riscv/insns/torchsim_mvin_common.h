@@ -110,6 +110,7 @@ for (uint64_t n=0; n<p_dim_size[0]; n++) {
 }
 
 // Store data to spad by block_stride
+bool is_sparse_tile = true;
 for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
     for (uint64_t vlane_idx=0; vlane_idx<n_vu; vlane_idx++) {
         for (uint64_t n=0; n<block_dim[N]; n++) {
@@ -163,21 +164,25 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
 
                         if (element_size == 1) {
                             uint8_t val = is_used_vlane ? MMU.load_uint8(d_addr) : 0;
+                            is_sparse_tile &= (val == 0);
                             MMU.store_uint8(s_addr, val);
                             if (debug_flag && is_used_vlane)
                                 printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %x\n", d_idx, d_addr, s_addr, *((char*)&val));
                         } else if (element_size == 2) {
                             uint16_t val = is_used_vlane ? MMU.load_uint16(d_addr) : 0;
+                            is_sparse_tile &= (val == 0);
                             MMU.store_uint16(s_addr, val);
                             if (debug_flag && is_used_vlane)
                                 printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %x\n", d_idx, d_addr, s_addr, *((short*)&val));
                         } else if (element_size == 4) {
                             uint32_t val = is_used_vlane ? MMU.load_uint32(d_addr) : 0;
+                            is_sparse_tile &= ((*((float*)&val) == 0.0) || val == 0);
                             MMU.store_uint32(s_addr, val);
                             if (debug_flag && is_used_vlane)
-                                printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %f\n", d_idx, d_addr, s_addr, *((float*)&val));
+                                printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %f, is_sp: %d\n", d_idx, d_addr, s_addr, *((float*)&val), is_sparse_tile);
                         } else if (element_size == 8) {
                             uint64_t val = is_used_vlane ? MMU.load_uint64(d_addr) : 0;
+                            is_sparse_tile &= (val == 0);
                             MMU.store_uint64(s_addr, val);
                             if (debug_flag && is_used_vlane)
                                 printf("- Buffer_idx: %ld, Dram_addr: 0x%lx, Spad_addr: 0x%lx, Val: %f\n", d_idx, d_addr, s_addr, *((double*)&val));
@@ -193,3 +198,20 @@ if (dma_buffer != nullptr) {
     delete [] static_cast<uint64_t*>(dma_buffer);
     dma_buffer = nullptr;
 }
+
+const char* env = std::getenv("SPIKE_DUMP_SPARSE_TILE");
+bool dump_sparse_tile = false;
+if (env && is_sparse_tile) {
+    std::string val(env);
+    if (val == "1" || val == "true" || val == "TRUE") {
+        std::string file_path = std::string(P.base_path) + "/dma_access/sparse_tile.raw";
+        FILE* fp = fopen(file_path.c_str(), "ab");
+        if (!fp) {
+            fprintf(stderr, "Failed to open file for writing: %s\n", file_path);
+        } else {
+            fwrite(&P.VU.dma_counter, sizeof(uint64_t), 1, fp);
+            fclose(fp);
+        }
+    }
+}
+P.VU.dma_counter++;
