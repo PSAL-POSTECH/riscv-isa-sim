@@ -15,4 +15,8 @@
 # define NORETURN
 #endif
 
+// ERROR CODES
+#define INVALID_SPAD_ACCESS 200
+#define STACK_OVERFLOW 201
+
 #endif

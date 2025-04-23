@@ -1655,12 +1655,18 @@ reg_t index[P.VU.vlmax]; \
   VI_CHECK_LOAD(elt_width, is_mask_ldst); \
   const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   const reg_t vstart = P.VU.vstart->read(); \
+  uint64_t spad_sp = 0; \
+  bool using_stack = false; \
   if (P.get_kernel_flag() && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
     reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+    using_stack = true; \
   } \
+  else \
+    spad_sp = MMU.get_spad_base_vaddr() + P.VU.vu_sram_byte - (P.get_kernel_sb() - P.get_kernel_sp()); \
+  \
   P.VU.vstart->write(vstart); \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     for (reg_t i = 0; i < vl; ++i) { \
@@ -1668,9 +1674,15 @@ reg_t index[P.VU.vlmax]; \
       VI_STRIP(i); \
       for (reg_t fn = 0; fn < nf; ++fn) { \
         uint64_t addr = baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t); \
-        if (P.get_kernel_flag() && (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte)) { \
-          printf("VI_LD ERROR: Access address overflow: 0x%lx\n", addr); \
-          exit(-1); \
+        if (P.get_kernel_flag()) { \
+          if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
+            printf("VI_LD ERROR: Accessing invalid spad address: 0x%lx\n", addr); \
+            exit(INVALID_SPAD_ACCESS); \
+          } \
+          if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
+            printf("VI_LD ERROR: Accessing stack address: 0x%lx\n", addr); \
+            exit(STACK_OVERFLOW); \
+          } \
         } \
         elt_width##_t val = MMU.load_##elt_width(addr); \
         P.VU.elt<elt_width##_t>(vd + fn * emul, vreg_inx, vu_idx, true) = val; \
@@ -1726,14 +1738,20 @@ reg_t index[P.VU.vlmax]; \
   const reg_t vl = is_mask_ldst ? ((P.VU.vl->read() + 7) / 8) : P.VU.vl->read(); \
   reg_t baseAddr = RS1; \
   const reg_t vs3 = insn.rd(); \
+  uint64_t spad_sp = 0; \
+  bool using_stack = false; \
   VI_CHECK_STORE(elt_width, is_mask_ldst); \
   if (P.get_kernel_flag() && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
     reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+    using_stack = true; \
   } \
+  else \
+    spad_sp = MMU.get_spad_base_vaddr() + P.VU.vu_sram_byte - (P.get_kernel_sb() - P.get_kernel_sp()); \
   const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
+  \
   for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
     for (reg_t i = 0; i < vl; ++i) { \
       VI_STRIP(i) \
@@ -1741,9 +1759,15 @@ reg_t index[P.VU.vlmax]; \
       P.VU.vstart->write(i); \
       for (reg_t fn = 0; fn < nf; ++fn) { \
         uint64_t addr = baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t); \
-        if (P.get_kernel_flag() && (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte)) { \
-          printf("VI_ST ERROR: Access address overflow: 0x%lx\n", addr); \
-          exit(-1); \
+        if (P.get_kernel_flag()) { \
+          if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
+            printf("VI_ST ERROR: Access address overflow: 0x%lx\n", addr); \
+            exit(INVALID_SPAD_ACCESS); \
+          } \
+          if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
+            printf("VI_ST ERROR: Accessing stack address: 0x%lx\n", addr); \
+            exit(STACK_OVERFLOW); \
+          } \
         } \
         elt_width##_t val = P.VU.elt<elt_width##_t>(vs3 + fn * emul, vreg_inx, vu_idx); \
         MMU.store_##elt_width( \
@@ -1844,12 +1868,19 @@ reg_t index[P.VU.vlmax]; \
   const reg_t size = len * elt_per_reg; \
   const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   const reg_t vstart = P.VU.vstart->read(); \
+  uint64_t spad_sp = 0; \
+  bool using_stack = false; \
+  \
   if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
     reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+    using_stack = true; \
   } \
+  else \
+    spad_sp = MMU.get_spad_base_vaddr() + P.VU.vu_sram_byte - (P.get_kernel_sb() - P.get_kernel_sp()); \
+  \
   if (P.VU.vstart->read() < size) { \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       P.VU.vstart->write(vstart); \
@@ -1857,8 +1888,18 @@ reg_t index[P.VU.vlmax]; \
       reg_t off = P.VU.vstart->read() % elt_per_reg; \
       if (off) { \
         for (reg_t pos = off; pos < elt_per_reg; ++pos) { \
-          auto val = MMU.load_## elt_width(baseAddr + vu_idx * P.VU.vu_sram_byte + \
-            P.VU.vstart->read() * sizeof(elt_width ## _t)); \
+          uint64_t addr = baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read() * sizeof(elt_width ## _t); \
+          if (P.get_kernel_flag()){ \
+            if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
+              printf("VI_LD_WHOLE ERROR: Accessing invalid spad address: 0x%lx\n", addr); \
+              exit(INVALID_SPAD_ACCESS); \
+            } \
+            if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
+              printf("VI_LD_WHOLE ERROR: Accessing stack address: 0x%lx\n", addr); \
+              exit(STACK_OVERFLOW); \
+            } \
+          } \
+          auto val = MMU.load_## elt_width(addr); \
           P.VU.elt<elt_width ## _t>(vd + i, pos, vu_idx, true) = val; \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
         } \
@@ -1866,8 +1907,18 @@ reg_t index[P.VU.vlmax]; \
       } \
       for (; i < len; ++i) { \
         for (reg_t pos = 0; pos < elt_per_reg; ++pos) { \
-          auto val = MMU.load_## elt_width(baseAddr + vu_idx * P.VU.vu_sram_byte + \
-            P.VU.vstart->read() * sizeof(elt_width ## _t)); \
+          uint64_t addr = baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read() * sizeof(elt_width ## _t); \
+          if (P.get_kernel_flag()){ \
+            if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
+              printf("VI_LD_WHOLE ERROR: Accessing invalid spad address: 0x%lx\n", addr); \
+              exit(INVALID_SPAD_ACCESS); \
+            } \
+            if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
+              printf("VI_LD_WHOLE ERROR: Accessing stack address: 0x%lx\n", addr); \
+              exit(STACK_OVERFLOW); \
+            } \
+          } \
+          auto val = MMU.load_## elt_width(addr); \
           P.VU.elt<elt_width ## _t>(vd + i, pos, vu_idx, true) = val; \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
         } \
@@ -1885,13 +1936,19 @@ reg_t index[P.VU.vlmax]; \
   const reg_t size = len * P.VU.vlenb; \
   const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   const reg_t vstart = P.VU.vstart->read(); \
+  uint64_t spad_sp = 0; \
+  bool using_stack = false; \
   \
   if (P.get_kernel_flag()  && baseAddr >= P.get_kernel_sp() && baseAddr < P.get_kernel_sb()) { \
     reg_t prev = baseAddr; \
     reg_t spad_base_vaddr = MMU.get_spad_base_vaddr(); \
     reg_t stack_offset = P.get_kernel_sb() - baseAddr; \
     baseAddr = spad_base_vaddr + (P.VU.vu_sram_byte - stack_offset); \
+    using_stack = true; \
   } \
+  else \
+    spad_sp = MMU.get_spad_base_vaddr() + P.VU.vu_sram_byte - (P.get_kernel_sb() - P.get_kernel_sp()); \
+  \
   if (P.VU.vstart->read() < size) { \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       P.VU.vstart->write(vstart); \
@@ -1899,16 +1956,38 @@ reg_t index[P.VU.vlmax]; \
       reg_t off = P.VU.vstart->read() % P.VU.vlenb; \
       if (off) { \
         for (reg_t pos = off; pos < P.VU.vlenb; ++pos) { \
+          uint64_t addr = baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read(); \
+          if (P.get_kernel_flag()){ \
+            if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
+              printf("VI_ST_WHOLE ERROR: Accessing invalid spad address: 0x%lx\n", addr); \
+              exit(INVALID_SPAD_ACCESS); \
+            } \
+            if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
+              printf("VI_ST_WHOLE ERROR: Accessing stack address: 0x%lx\n", addr); \
+              exit(STACK_OVERFLOW); \
+            } \
+          } \
           auto val = P.VU.elt<uint8_t>(vs3 + i, pos, vu_idx); \
-          MMU.store_uint8(baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read(), val); \
+          MMU.store_uint8(addr, val); \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
         } \
         i++; \
       } \
       for (; i < len; ++i) { \
         for (reg_t pos = 0; pos < P.VU.vlenb; ++pos) { \
+          uint64_t addr = baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read(); \
+          if (P.get_kernel_flag()){ \
+            if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
+              printf("VI_ST_WHOLE ERROR: Accessing invalid spad address: 0x%lx\n", addr); \
+              exit(INVALID_SPAD_ACCESS); \
+            } \
+            if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
+              printf("VI_ST_WHOLE ERROR: Accessing stack address: 0x%lx\n", addr); \
+              exit(STACK_OVERFLOW); \
+            } \
+          } \
           auto val = P.VU.elt<uint8_t>(vs3 + i, pos, vu_idx); \
-          MMU.store_uint8(baseAddr + vu_idx * P.VU.vu_sram_byte + P.VU.vstart->read(), val); \
+          MMU.store_uint8(addr, val); \
           P.VU.vstart->write(P.VU.vstart->read() + 1); \
         } \
       } \
