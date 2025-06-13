@@ -1673,19 +1673,25 @@ reg_t index[P.VU.vlmax]; \
       VI_ELEMENT_SKIP(i); \
       VI_STRIP(i); \
       for (reg_t fn = 0; fn < nf; ++fn) { \
-        uint64_t addr = baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t); \
-        if (P.get_kernel_flag()) { \
-          if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
-            printf("VI_LD ERROR: Accessing invalid spad address: 0x%lx\n", addr); \
-            exit(INVALID_SPAD_ACCESS); \
+        if (baseAddr < 0x01000000) { /* For non vector space */ \
+          uint64_t addr = baseAddr + (stride) + (offset) * sizeof(elt_width##_t); \
+          elt_width##_t val = MMU.load_##elt_width(addr); \
+          P.VU.elt<elt_width##_t>(vd + fn * emul, vreg_inx, vu_idx, true) = val; \
+        } else {\
+          uint64_t addr = baseAddr + vu_idx*P.VU.vu_sram_byte + (stride) + (offset) * sizeof(elt_width##_t); \
+          if (P.get_kernel_flag()) { \
+            if (addr < MMU.get_spad_base_vaddr() || addr > MMU.get_spad_base_vaddr() + (vu_idx + 1) * P.VU.vu_sram_byte) { \
+              printf("VI_LD ERROR: Accessing invalid spad address: 0x%lx pc: 0x%lx", addr, pc); \
+              exit(INVALID_SPAD_ACCESS); \
+            } \
+            if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
+              printf("VI_LD ERROR: Accessing stack address: 0x%lx\n", addr); \
+              exit(STACK_OVERFLOW); \
+            } \
           } \
-          if (!using_stack && addr >= spad_sp + vu_idx * P.VU.vu_sram_byte) { \
-            printf("VI_LD ERROR: Accessing stack address: 0x%lx\n", addr); \
-            exit(STACK_OVERFLOW); \
-          } \
+          elt_width##_t val = MMU.load_##elt_width(addr); \
+          P.VU.elt<elt_width##_t>(vd + fn * emul, vreg_inx, vu_idx, true) = val; \
         } \
-        elt_width##_t val = MMU.load_##elt_width(addr); \
-        P.VU.elt<elt_width##_t>(vd + fn * emul, vreg_inx, vu_idx, true) = val; \
       } \
     } \
     P.VU.vstart->write(0); \

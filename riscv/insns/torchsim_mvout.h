@@ -2,12 +2,12 @@
 // mvin rs1, rs2
 // rs1 = virtual main memory address
 // rs2: scratchpad address
+#include "common.h"
 
 #define N 0
 #define C 1
 #define H 2
 #define W 3
-
 #define ROUNDUP(X, Y) (((X) + (Y) - 1) / (Y) * (Y))
 static int indirect_counter;
 std::map<uint64_t, uint64_t> indirect_map;
@@ -122,7 +122,7 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
 
                         if (scratchpadAddr + s_idx * element_size >= P.VU.sram_v_space.first + P.VU.vu_sram_byte) {
                             fprintf(stderr, "MVOUT ERROR: Scratchpad address overflow: 0x%lx\n", s_addr);
-                            exit(-1);
+                            exit(INVALID_SPAD_ACCESS);
                         }
 
                         if (debug_flag)
