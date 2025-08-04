@@ -1,0 +1,56 @@
+name: Build and Release Spike for TorchSim
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout riscv-isa-sim
+        uses: actions/checkout@v4
+        with:
+          repository: PSAL-POSTECH/riscv-isa-sim
+          ref: TorchSim
+
+      - name: Build Spike
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace \
+            ghcr.io/psal-postech/torchsim_base:latest \
+            bash -c '
+              mkdir -p build && cd build &&
+              ../configure --prefix=/workspace/release &&
+              make -j$(nproc) &&
+              make install'
+
+      - name: Archive Build Artifacts
+        run: |
+          tar -czvf spike-release.tar.gz release
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: spike-release.tar.gz
+          asset_name: spike-release.tar.gz
+          asset_content_type: application/gzip
+
