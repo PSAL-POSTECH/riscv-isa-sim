@@ -133,6 +133,7 @@ riscv_insn_ext_i = \
 	torchsim_vpop \
 	torchsim_compute \
 	torchsim_vexp \
+	# torchsim_vexp2 \
 	torchsim_verf \
 	torchsim_vtanh \
 	torchsim_vsin \
