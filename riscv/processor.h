@@ -84,6 +84,15 @@ enum VRM{
   INVALID_RM
 };
 
+/* Disambiguates SEW=8 at the systolic array boundary: 8 bits alone cannot say
+   int8 from e4m3 from e5m2.  Carried in the DMA descriptor's byte 117, which
+   was padding, so the struct's size and the frontend's layout are unchanged. */
+enum ELEM_DTYPE{
+  ELEM_DTYPE_INT = 0,
+  ELEM_DTYPE_FP8E4M3 = 1,
+  ELEM_DTYPE_FP8E5M2 = 2
+};
+
 template<uint64_t N>
 struct type_usew_t;
 
@@ -232,6 +241,7 @@ typedef enum {
   // 65('A') ~ 90('Z') is reserved for standard isa in misa
   EXT_ZFH,
   EXT_ZFHMIN,
+  EXT_ZVFP8,
   EXT_ZBA,
   EXT_ZBB,
   EXT_ZBC,
@@ -546,6 +556,8 @@ public:
       bool vstart_alu;
       reg_t n_vu;
       std::pair<reg_t, reg_t> sram_v_space;
+
+      reg_t elem_dtype = ELEM_DTYPE_INT;     // descriptor byte 117; see enum ELEM_DTYPE
 
       // VU SRAM
       reg_t vu_sram_byte = 0;
