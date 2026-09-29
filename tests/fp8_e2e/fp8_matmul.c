@@ -44,6 +44,7 @@ typedef struct {
   // int8; WHICH fp8 is vtype's altfmt (bit 8), so it cannot be spelt in the
   // instruction text -- a case picks its format at run time.
   unsigned long vt8;
+  int fmt;              /* 1 = E4M3, 2 = E5M2 */
 } job_t;
 
 // e8, m1, ta, ma -- and bit 8 (altfmt) chooses E5M2 over E4M3.
@@ -62,10 +63,15 @@ static uint8_t g_out[4 * 32 * 32];
 
 // w_vpush v1 = 0x2600305b|(1<<20), i_vpush v2 = 0x2200305b|(2<<20),
 // vpop v3 = 0x0800305b|(3<<7), vpop v4 = 0x0800305b|(4<<7).
-#define W_VPUSH_V1 ".word 0x2610305b\n\t"
-#define I_VPUSH_V2 ".word 0x2220305b\n\t"
-#define VPOP_V3    ".word 0x080031db\n\t"
-#define VPOP_V4    ".word 0x0800325b\n\t"
+// THE FORMAT RIDES IN rs1 (bits 19:15), which these opcodes never used. The array
+// cannot read it anywhere else: llc owns the vsetvli in front of a push, and fp8
+// made inside a kernel never rode a DMA. 0 is int8, 1 is E4M3, 2 is E5M2.
+#define XS(x) #x
+#define S(x) XS(x)
+#define W_VPUSH_V1(F) ".word " S(0x2610305b + ((F) << 15)) "\n\t"
+#define I_VPUSH_V2(F) ".word " S(0x2220305b + ((F) << 15)) "\n\t"
+#define VPOP_V3(F)    ".word " S(0x080031db + ((F) << 15)) "\n\t"
+#define VPOP_V4(F)    ".word " S(0x0800325b + ((F) << 15)) "\n\t"
 
 __attribute__((noinline, aligned(64)))
 void npu_kernel(job_t *j)
@@ -84,34 +90,41 @@ void npu_kernel(job_t *j)
 
   // Always push nvu weights per lane: the SA weight deque is a sliding window of
   // sa_dim entries, so a short push would leave the previous case's tail in it.
-  if (j->out32) {
-    asm volatile(
-      "vsetvl %0, %1, %6\n\t"
-      "vle8.v v1, (%2)\n\t"
-      W_VPUSH_V1
-      "vsetvl %0, %3, %6\n\t"
-      "vle8.v v2, (%4)\n\t"
-      I_VPUSH_V2
-      "vsetvli %0, %3, e32, m4, ta, ma\n\t"
-      VPOP_V4
-      "vse32.v v4, (%5)\n\t"
-      : "=&r"(t)
-      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys), "r"(j->vt8)
-      : "memory");
-  } else {
-    asm volatile(
-      "vsetvl %0, %1, %6\n\t"
-      "vle8.v v1, (%2)\n\t"
-      W_VPUSH_V1
-      "vsetvl %0, %3, %6\n\t"
-      "vle8.v v2, (%4)\n\t"
-      I_VPUSH_V2
-      VPOP_V3
-      "vse8.v v3, (%5)\n\t"
-      : "=&r"(t)
-      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys), "r"(j->vt8)
-      : "memory");
+#define NPU_BODY(F, FPOP)                                                     \
+  if (j->out32) {                                                             \
+    asm volatile(                                                             \
+      "vsetvl %0, %1, %6\n\t"                                                \
+      "vle8.v v1, (%2)\n\t"                                                  \
+      W_VPUSH_V1(F)                                                           \
+      "vsetvl %0, %3, %6\n\t"                                                \
+      "vle8.v v2, (%4)\n\t"                                                  \
+      I_VPUSH_V2(F)                                                           \
+      "vsetvli %0, %3, e32, m4, ta, ma\n\t"                                  \
+      VPOP_V4(0)                                                              \
+      "vse32.v v4, (%5)\n\t"                                                 \
+      : "=&r"(t)                                                              \
+      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys), "r"(j->vt8)        \
+      : "memory");                                                            \
+  } else {                                                                    \
+    asm volatile(                                                             \
+      "vsetvl %0, %1, %6\n\t"                                                \
+      "vle8.v v1, (%2)\n\t"                                                  \
+      W_VPUSH_V1(F)                                                           \
+      "vsetvl %0, %3, %6\n\t"                                                \
+      "vle8.v v2, (%4)\n\t"                                                  \
+      I_VPUSH_V2(F)                                                           \
+      VPOP_V3(FPOP)                                                           \
+      "vse8.v v3, (%5)\n\t"                                                  \
+      : "=&r"(t)                                                              \
+      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys), "r"(j->vt8)        \
+      : "memory");                                                            \
   }
+
+  /* An fp32 pop reads e32, so its format field is 0; an fp8 pop is the kernel's. */
+  if (j->fmt == 2)
+    NPU_BODY(2, 2)
+  else
+    NPU_BODY(1, 1)
 
   CONFIG_DESC(j->dy);
   MVOUT(j->Y, ys);
@@ -170,6 +183,7 @@ static int run_case(const fp8_case_t *c, int nvu, int quiet)
   job.W = c->W; job.X = c->X; job.Y = g_out;
   job.nvu = nvu; job.R = R; job.out32 = (c->out == 32);
   job.vt8 = (c->fmt == 1) ? VT8_E4M3 : VT8_E5M2;
+  job.fmt = c->fmt;
   npu_kernel(&job);
 
   for (i = 0; i < n; i++) {

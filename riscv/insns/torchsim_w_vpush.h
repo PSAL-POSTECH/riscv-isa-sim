@@ -2,6 +2,11 @@ reg_t vs = insn.rs2();
 const reg_t vl = P.VU.vl->read();
 const reg_t n_vu = P.VU.get_vu_num();
 const reg_t vstart = P.VU.vstart->read();
+// THE INSTRUCTION CARRIES ITS OWN FORMAT, in the rs1 field these opcodes never
+// used: enum ELEM_DTYPE, 0 meaning int8. Neither vtype nor the descriptor can say
+// it here -- llc owns the vsetvli in front of a push, and fp8 made inside a kernel
+// never rode a DMA -- so the only place left is the push itself.
+const reg_t sa_fmt = insn.rs1();
 const char* debug_env = std::getenv("SPIKE_DEBUG");
 const int debug_flag = debug_env ? std::stoi(debug_env) : 0;
 
@@ -17,10 +22,9 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
         switch (P.VU.vsew) {
           case e8:
             // Unrecognised dtype keeps meaning int8; see torchsim_i_vpush.h.
-            if (P.VU.elem_dtype == ELEM_DTYPE_FP8E4M3 ||
-                P.VU.elem_dtype == ELEM_DTYPE_FP8E5M2) {
-              softfloat_fp8Format = P.VU.altfmt ? softfloat_fp8_e5m2
-                                                : softfloat_fp8_e4m3;
+            if (sa_fmt == ELEM_DTYPE_FP8E4M3 || sa_fmt == ELEM_DTYPE_FP8E5M2) {
+              softfloat_fp8Format = (sa_fmt == ELEM_DTYPE_FP8E5M2)
+                                    ? softfloat_fp8_e5m2 : softfloat_fp8_e4m3;
               float32_t fp32 = f8_to_f32(P.VU.elt<float8_t>(vs, vreg_inx, vu_idx));
               memcpy(&val, &fp32.v, sizeof(float));
             } else {
