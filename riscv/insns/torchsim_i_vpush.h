@@ -21,8 +21,8 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
             // and anything unrecognised has to keep meaning int8.
             if (P.VU.elem_dtype == ELEM_DTYPE_FP8E4M3 ||
                 P.VU.elem_dtype == ELEM_DTYPE_FP8E5M2) {
-              softfloat_fp8Format = (P.VU.elem_dtype == ELEM_DTYPE_FP8E5M2)
-                                    ? softfloat_fp8_e5m2 : softfloat_fp8_e4m3;
+              softfloat_fp8Format = P.VU.altfmt ? softfloat_fp8_e5m2
+                                                : softfloat_fp8_e4m3;
               float32_t fp32 = f8_to_f32(P.VU.elt<float8_t>(vs, vreg_inx, vu_idx));
               memcpy(&val, &fp32.v, sizeof(float));
             } else {

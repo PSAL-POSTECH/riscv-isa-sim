@@ -22,8 +22,13 @@
 extern void k_config(const void *desc);
 extern void k_mvin(const void *dram, void *spad);
 extern void k_mvout(void *dram, void *spad);
-extern void k_vfadd8(void *a, void *b, void *c, long n);
-extern void k_vfmul8(void *a, void *b, void *c, long n);
+/* The last argument is vtype: the descriptor says fp8-or-int, vtype says WHICH fp8. */
+extern void k_vfadd8(void *a, void *b, void *c, long n, unsigned long vt);
+extern void k_vfmul8(void *a, void *b, void *c, long n, unsigned long vt);
+
+/* e8, m1, ta, ma -- bit 8 is altfmt, which selects E5M2 over E4M3. */
+#define VT8_E4M3 0xC0UL
+#define VT8_E5M2 0x1C0UL
 extern void k_vadd8(void *a, void *b, void *c, long n);
 
 typedef struct {
@@ -321,6 +326,8 @@ static const uint8_t add_e5[NVEC] = {0x3C, 0x44, 0x41, 0x39, 0x3E, 0x02, 0x48, 0
 static const uint8_t mul_e4[NVEC] = {0x38, 0x48, 0x40, 0x30, 0xC0, 0x00, 0x40, 0x51};
 static const uint8_t mul_e5[NVEC] = {0x34, 0x44, 0x3C, 0x2C, 0xBC, 0x00, 0x3C, 0x4C};
 
+static unsigned long fmt_vt = VT8_E4M3;   /* what the next fmt_run computes in */
+
 static void fmt_setup(uint8_t dtype)
 {
 	int n = NVEC * lanes;
@@ -352,10 +359,10 @@ static int fmt_run(const char *tag, int mul, const uint8_t *want, int want_ok)
 
 	if (mul)
 		k_vfmul8((void *)(SPAD_BASE + OFF_A), (void *)(SPAD_BASE + OFF_B),
-			 (void *)(SPAD_BASE + OFF_C), NVEC);
+			 (void *)(SPAD_BASE + OFF_C), NVEC, fmt_vt);
 	else
 		k_vfadd8((void *)(SPAD_BASE + OFF_A), (void *)(SPAD_BASE + OFF_B),
-			 (void *)(SPAD_BASE + OFF_C), NVEC);
+			 (void *)(SPAD_BASE + OFF_C), NVEC, fmt_vt);
 	k_mvout(bufC, (void *)(SPAD_BASE + OFF_C));
 
 	memcpy(got, bufC, n);
@@ -374,44 +381,55 @@ static void dump_vec(const char *what, const uint8_t *want)
 
 static void test_format_selector(void)
 {
-	printf("\n=== 3. E4M3 / E5M2 format selector ===\n");
+	printf("\n=== 3. E4M3 / E5M2 format selector (vtype altfmt) ===\n");
 	dump_vec("expect E4M3", add_e4);
 	dump_vec("expect E5M2", add_e5);
 
-	printf(" -- 3a dtype=1 (E4M3)\n");
-	fmt_setup(DT_E4M3);
+	printf(" -- 3a altfmt=0 (E4M3)\n");
+	fmt_setup(DT_E4M3); fmt_vt = VT8_E4M3;
 	fmt_run("vfadd E4M3", 0, add_e4, 1);
 	fmt_run("vfadd E4M3 != E5M2 table", 0, add_e5, 0);
 	fmt_run("vfmul E4M3", 1, mul_e4, 1);
 
-	printf(" -- 3b dtype=2 (E5M2)\n");
-	fmt_setup(DT_E5M2);
+	printf(" -- 3b altfmt=1 (E5M2)\n");
+	fmt_setup(DT_E5M2); fmt_vt = VT8_E5M2;
 	fmt_run("vfadd E5M2", 0, add_e5, 1);
 	fmt_run("vfadd E5M2 != E4M3 table", 0, add_e4, 0);
 	fmt_run("vfmul E5M2", 1, mul_e5, 1);
 
-	/* Leak regression: E5M2 first leaves softfloat_fp8Format at e5m2; if the
-	   ALU did not re-inject from byte 117 the next E4M3 op would inherit it. */
+	/* Leak regression: every vsetvl re-states altfmt, so a previous op's format
+	   cannot survive into the next one. It would if anything cached the choice. */
 	printf(" -- 3c leak regression E5M2 -> E4M3\n");
-	fmt_setup(DT_E5M2);
+	fmt_setup(DT_E5M2); fmt_vt = VT8_E5M2;
 	fmt_run("prime with E5M2", 0, add_e5, 1);
-	fmt_setup(DT_E4M3);
+	fmt_setup(DT_E4M3); fmt_vt = VT8_E4M3;
 	fmt_run("E4M3 after E5M2", 0, add_e4, 1);
 	fmt_run("E4M3 after E5M2 not contaminated", 0, add_e5, 0);
 
 	printf(" -- 3d leak regression E4M3 -> E5M2\n");
-	fmt_setup(DT_E4M3);
+	fmt_setup(DT_E4M3); fmt_vt = VT8_E4M3;
 	fmt_run("prime with E4M3", 0, add_e4, 1);
-	fmt_setup(DT_E5M2);
+	fmt_setup(DT_E5M2); fmt_vt = VT8_E5M2;
 	fmt_run("E5M2 after E4M3", 0, add_e5, 1);
 	fmt_run("E5M2 after E4M3 not contaminated", 0, add_e4, 0);
 
-	/* Cross-op poison: vfmul under E5M2, then vfadd under E4M3. */
 	printf(" -- 3e cross-op poison vfmul(E5M2) -> vfadd(E4M3)\n");
-	fmt_setup(DT_E5M2);
+	fmt_setup(DT_E5M2); fmt_vt = VT8_E5M2;
 	fmt_run("vfmul E5M2 poison", 1, mul_e5, 1);
-	fmt_setup(DT_E4M3);
+	fmt_setup(DT_E4M3); fmt_vt = VT8_E4M3;
 	fmt_run("vfadd E4M3 after poison", 0, add_e4, 1);
+
+	/* THE DESCRIPTOR DOES NOT CHOOSE THE FORMAT ANY MORE, and this is the check
+	   that says so. Byte 117 still separates fp8 from int8 -- one push instruction
+	   takes both and vtype cannot tell them apart -- but WHICH fp8 is vtype's
+	   altfmt. Disagree on purpose and vtype must win. */
+	printf(" -- 3f the descriptor does not choose the format\n");
+	fmt_setup(DT_E4M3); fmt_vt = VT8_E5M2;
+	fmt_run("desc=E4M3 vtype=E5M2 computes E5M2", 0, add_e5, 1);
+	fmt_run("desc=E4M3 vtype=E5M2 is not E4M3", 0, add_e4, 0);
+	fmt_setup(DT_E5M2); fmt_vt = VT8_E4M3;
+	fmt_run("desc=E5M2 vtype=E4M3 computes E4M3", 0, add_e4, 1);
+	fmt_run("desc=E5M2 vtype=E4M3 is not E5M2", 0, add_e5, 0);
 }
 
 /*--------------------------------------------------------------------------*/
@@ -511,8 +529,10 @@ static void test_int8(void)
 		cmp_bytes("int8 vadd.vv, byte117=0xFF", bufC, want, n, 1);
 	}
 
-	/* Same garbage byte, now driving a vector fp8 op: 0xFF is neither 1 nor 2
-	   but silently selects E4M3. Recorded, not asserted as desirable. */
+	/* Same garbage byte, now driving a vector fp8 op. THE VECTOR ALU NEVER READS
+	   BYTE 117: a float instruction at e8 is fp8 by being a float instruction, and
+	   which fp8 is vtype's. So the descriptor can say anything -- including the
+	   0xFF a pre-fp8 producer leaves -- and the answer follows vtype alone. */
 	{
 		int n = NVEC * lanes;
 		uint64_t m2[4] = {0, 0, NVEC, 1};
@@ -527,15 +547,18 @@ static void test_int8(void)
 			}
 		memset(bufC, 0x5A, sizeof bufC);
 		spad_fill(OFF_C, NVEC, 0xAA);
-		/* Prime with E5M2 so "no injection" would be visible. */
 		desc_build(2, 1, 1, lanes, NVEC, m2, s2, 1, 1, 1, DT_E5M2);
 		k_config(&desc);
 		k_mvin(bufA, (void *)(SPAD_BASE + OFF_A));
 		k_mvin(bufB, (void *)(SPAD_BASE + OFF_B));
-		fmt_run("prime E5M2 before garbage", 0, add_e5, 1);
+		fmt_vt = VT8_E5M2;
+		fmt_run("desc=E5M2 vtype=E5M2", 0, add_e5, 1);
+		/* byte 117 becomes the old padding garbage; vtype is untouched. */
 		desc_build(2, 1, 1, lanes, NVEC, m2, s2, 1, 1, 0, 0);
 		k_config(&desc);
-		fmt_run("byte117=0xFF selects E4M3", 0, add_e4, 1);
+		fmt_run("byte117=0xFF does not disturb the vector ALU", 0, add_e5, 1);
+		fmt_vt = VT8_E4M3;
+		fmt_run("byte117=0xFF, vtype says E4M3", 0, add_e4, 1);
 	}
 }
 

@@ -37,7 +37,9 @@ k_mvout:
 	.globl	k_vfadd8
 	.type	k_vfadd8, @function
 k_vfadd8:
-	vsetvli	t0, a3, e8, m1, ta, ma
+	# a4 IS THE vtype: altfmt (bit 8) is what says E5M2 rather than E4M3,
+	# and it cannot be spelt in the text because the caller picks it.
+	vsetvl	t0, a3, a4
 	vle8.v	v1, (a0)
 	vle8.v	v2, (a1)
 	vfadd.vv	v3, v1, v2
@@ -48,7 +50,9 @@ k_vfadd8:
 	.globl	k_vfmul8
 	.type	k_vfmul8, @function
 k_vfmul8:
-	vsetvli	t0, a3, e8, m1, ta, ma
+	# a4 IS THE vtype: altfmt (bit 8) is what says E5M2 rather than E4M3,
+	# and it cannot be spelt in the text because the caller picks it.
+	vsetvl	t0, a3, a4
 	vle8.v	v1, (a0)
 	vle8.v	v2, (a1)
 	vfmul.vv	v3, v1, v2

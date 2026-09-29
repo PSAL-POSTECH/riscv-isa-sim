@@ -27,8 +27,8 @@ for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) {
             // Unrecognised dtype keeps meaning int8; see torchsim_i_vpush.h.
             if (P.VU.elem_dtype == ELEM_DTYPE_FP8E4M3 ||
                 P.VU.elem_dtype == ELEM_DTYPE_FP8E5M2) {
-              softfloat_fp8Format = (P.VU.elem_dtype == ELEM_DTYPE_FP8E5M2)
-                                    ? softfloat_fp8_e5m2 : softfloat_fp8_e4m3;
+              softfloat_fp8Format = P.VU.altfmt ? softfloat_fp8_e5m2
+                                                : softfloat_fp8_e4m3;
               float32_t fp32;
               memcpy(&fp32.v, &val, sizeof(float));
               P.VU.elt<float8_t>(vd, vreg_inx, vu_idx, true) = f32_to_f8(fp32);

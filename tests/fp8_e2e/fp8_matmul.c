@@ -40,7 +40,15 @@ typedef struct {
   void *Y;
   long nvu, R;
   int out32;
+  // vtype FOR THE e8 PUSHES. The descriptor says an element is fp8 rather than
+  // int8; WHICH fp8 is vtype's altfmt (bit 8), so it cannot be spelt in the
+  // instruction text -- a case picks its format at run time.
+  unsigned long vt8;
 } job_t;
+
+// e8, m1, ta, ma -- and bit 8 (altfmt) chooses E5M2 over E4M3.
+#define VT8_E4M3 0xC0UL
+#define VT8_E5M2 0x1C0UL
 
 static desc_t g_dw, g_dx, g_dy;
 static uint8_t g_out[4 * 32 * 32];
@@ -78,30 +86,30 @@ void npu_kernel(job_t *j)
   // sa_dim entries, so a short push would leave the previous case's tail in it.
   if (j->out32) {
     asm volatile(
-      "vsetvli %0, %1, e8, m1, ta, ma\n\t"
+      "vsetvl %0, %1, %6\n\t"
       "vle8.v v1, (%2)\n\t"
       W_VPUSH_V1
-      "vsetvli %0, %3, e8, m1, ta, ma\n\t"
+      "vsetvl %0, %3, %6\n\t"
       "vle8.v v2, (%4)\n\t"
       I_VPUSH_V2
       "vsetvli %0, %3, e32, m4, ta, ma\n\t"
       VPOP_V4
       "vse32.v v4, (%5)\n\t"
       : "=&r"(t)
-      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys)
+      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys), "r"(j->vt8)
       : "memory");
   } else {
     asm volatile(
-      "vsetvli %0, %1, e8, m1, ta, ma\n\t"
+      "vsetvl %0, %1, %6\n\t"
       "vle8.v v1, (%2)\n\t"
       W_VPUSH_V1
-      "vsetvli %0, %3, e8, m1, ta, ma\n\t"
+      "vsetvl %0, %3, %6\n\t"
       "vle8.v v2, (%4)\n\t"
       I_VPUSH_V2
       VPOP_V3
       "vse8.v v3, (%5)\n\t"
       : "=&r"(t)
-      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys)
+      : "r"(j->nvu), "r"(ws), "r"(j->R), "r"(xs), "r"(ys), "r"(j->vt8)
       : "memory");
   }
 
@@ -161,6 +169,7 @@ static int run_case(const fp8_case_t *c, int nvu, int quiet)
   job.dw = &g_dw; job.dx = &g_dx; job.dy = &g_dy;
   job.W = c->W; job.X = c->X; job.Y = g_out;
   job.nvu = nvu; job.R = R; job.out32 = (c->out == 32);
+  job.vt8 = (c->fmt == 1) ? VT8_E4M3 : VT8_E5M2;
   npu_kernel(&job);
 
   for (i = 0; i < n; i++) {
