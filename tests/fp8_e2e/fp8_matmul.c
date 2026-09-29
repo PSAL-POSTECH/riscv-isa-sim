@@ -26,8 +26,12 @@ typedef struct {
   uint64_t indirect_addr;    // +120
   uint16_t indirect_stride;  // +128
   uint16_t indirect_esize;   // +130
-  uint16_t pad[2];
+  uint8_t  indirect_dim;     // +132
+  uint8_t  pad132;
+  uint16_t indirect_lanes;   // +134
   uint64_t fill;             // +136
+  uint64_t dram_base;        // +144  0 = no bound
+  uint64_t dram_bytes;       // +152  0 = no bound
 } desc_t;
 
 typedef struct {
