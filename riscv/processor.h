@@ -84,9 +84,10 @@ enum VRM{
   INVALID_RM
 };
 
-/* Disambiguates SEW=8 at the systolic array boundary: 8 bits alone cannot say
-   int8 from e4m3 from e5m2.  Carried in the DMA descriptor's byte 117, which
-   was padding, so the struct's size and the frontend's layout are unchanged. */
+/* Says whether SEW=8 at the systolic array boundary is an integer or an fp8 --
+   a question vtype cannot answer, because one push instruction takes both. WHICH
+   fp8 it is comes from vtype's altfmt; the two named values are kept for
+   descriptors written before that moved. Carried in DMA descriptor byte 117. */
 enum ELEM_DTYPE{
   ELEM_DTYPE_INT = 0,
   ELEM_DTYPE_FP8E4M3 = 1,
@@ -550,6 +551,10 @@ public:
       vector_csr_t_p vxrm, vstart, vl, vtype;
       reg_t vma, vta;
       reg_t vsew;
+      // vtype BIT 8, the standard's altfmt: which of two same-width formats an
+      // element is. At e8 it picks E5M2 over E4M3, which is the only thing that
+      // tells the two apart -- eight bits alone cannot say.
+      reg_t altfmt;
       float vflmul;
       reg_t ELEN, VLEN;
       bool vill;
@@ -604,6 +609,7 @@ public:
         vma(0),
         vta(0),
         vsew(0),
+        altfmt(0),
         vflmul(0),
         ELEN(0),
         VLEN(0),

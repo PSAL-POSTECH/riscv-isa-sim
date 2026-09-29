@@ -2134,8 +2134,7 @@ reg_t index[P.VU.vlmax]; \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
   softfloat_roundingMode = STATE.frm->read(); \
-  softfloat_fp8Format = (P.VU.elem_dtype == ELEM_DTYPE_FP8E5M2) \
-                        ? softfloat_fp8_e5m2 : softfloat_fp8_e4m3;
+  softfloat_fp8Format = P.VU.altfmt ? softfloat_fp8_e5m2 : softfloat_fp8_e4m3;
 
 #define VI_VFP_LOOP_BASE \
   VI_VFP_COMMON \
@@ -2713,12 +2712,33 @@ reg_t index[P.VU.vlmax]; \
   reg_t rs1_num = insn.rs1(); \
   reg_t rs2_num = insn.rs2(); \
   softfloat_roundingMode = STATE.frm->read(); \
-  softfloat_fp8Format = (P.VU.elem_dtype == ELEM_DTYPE_FP8E5M2) \
-                        ? softfloat_fp8_e5m2 : softfloat_fp8_e4m3; \
+  softfloat_fp8Format = P.VU.altfmt ? softfloat_fp8_e5m2 : softfloat_fp8_e4m3; \
   const reg_t n_vu = P.get_kernel_flag() ? P.VU.get_vu_num() : 1; \
   for (reg_t i=P.VU.vstart->read(); i<vl; ++i){ \
     for (reg_t vu_idx=0; vu_idx<n_vu; vu_idx++) { \
       VI_LOOP_ELEMENT_SKIP();
+
+// A QUAD NARROWING CONVERT: the destination is a quarter of the source's width,
+// so the source group is four times the destination's and vflmul is capped at 2.
+// vsew names the narrow side here, exactly as it does for the widen/narrow pair.
+#define VI_CHECK_QDS \
+  require_vector(true); \
+  require(P.VU.vflmul <= 2); \
+  require(P.VU.vsew * 4 <= P.VU.ELEN); \
+  require_align(insn.rs2(), P.VU.vflmul * 4); \
+  require_align(insn.rd(), P.VU.vflmul); \
+  require_vm; \
+  if (insn.rd() != insn.rs2()) \
+    require_noover(insn.rd(), P.VU.vflmul, insn.rs2(), P.VU.vflmul * 4);
+
+#define VI_VFP_NCVT_QUAD(BODY8, CHECK8) \
+  VI_CHECK_QDS \
+  require(P.VU.vsew == e8); \
+  CHECK8 \
+  VI_VFP_LOOP_SCALE_BASE \
+    BODY8 \
+    set_fp_exceptions; \
+  VI_VFP_LOOP_END
 
 #define VI_VFP_CVT_SCALE(BODY8, BODY16, BODY32, \
                          CHECK8, CHECK16, CHECK32, \
