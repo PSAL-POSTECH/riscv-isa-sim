@@ -40,6 +40,7 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
   VU.vu_sram_byte = scratchpad_size_per_vu;
   SA = new systolicArray_t(this, n_vu);
   XLU = new crossLaneUnit_t(this, n_vu);
+  MSA = new msaUnit_t(n_vu);
   //printf("VU sram_p_space > %lx %lx\n", vu_sram_p_space.first, vu_sram_p_space.second);
   //printf("VU sram_v_space > %lx %lx\n", vu_sram_v_space.first, vu_sram_v_space.second);
   parse_isa_string(isa);
@@ -78,6 +79,7 @@ processor_t::~processor_t()
   
   delete SA;
   delete XLU;
+  delete MSA;
   delete mmu;
   delete disassembler;
 }
@@ -680,6 +682,7 @@ void processor_t::reset()
   VU.reset();
   SA->reset();
   XLU->reset();
+  MSA->reset();
 
   if (n_pmp > 0) {
     // For backwards compatibility with software that is unaware of PMP,

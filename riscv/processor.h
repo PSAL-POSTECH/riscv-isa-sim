@@ -16,6 +16,7 @@
 #include "entropy_source.h"
 #include "csrs.h"
 #include "systolic_array.h"
+#include "msa_unit.h"
 #include "cross_lane_unit.h"
 
 class processor_t;
@@ -658,6 +659,7 @@ public:
   vectorUnit_t VU;
   systolicArray_t *SA;
   crossLaneUnit_t *XLU;
+  msaUnit_t *MSA;
   const char *base_path;
 };
 
