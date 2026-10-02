@@ -2118,9 +2118,8 @@ reg_t index[P.VU.vlmax]; \
 //
 // vector: vfp helper
 //
-/* fp8Format is injected per instruction from the descriptor's dtype byte, the way
-   roundingMode is injected from frm. Without it an e8 arm would run on whatever
-   the last torchsim vpush/vpop happened to leave in the global. */
+/* fp8Format is injected per instruction from vtype's altfmt, the way
+   roundingMode is injected from frm. */
 #define VI_VFP_COMMON \
   require_fp; \
   require((P.VU.vsew == e8 && p->extension_enabled(EXT_ZVFP8)) || \
