@@ -5,6 +5,7 @@
 #include "remote_bitbang.h"
 #include "cachesim.h"
 #include "extension.h"
+#include "vcix_accel_extension.h"
 #include <dlfcn.h>
 #include <fesvr/option_parser.h>
 #include <stdio.h>
@@ -13,6 +14,9 @@
 #include <string>
 #include <memory>
 #include <fstream>
+#include <map>
+#include <limits>
+#include "yaml-cpp/yaml.h"
 #include "../VERSION"
 
 static void help(int exit_code = 1)
@@ -73,7 +77,62 @@ static void help(int exit_code = 1)
   fprintf(stderr, "  --dm-no-halt-groups   Debug module won't support halt groups\n");
   fprintf(stderr, "  --scratchpad-base-vaddr=<addr> Scratchpad base virtual address\n");
   fprintf(stderr, "  --scratchpad-size=<size>       Scratchpad size\n");
+  fprintf(stderr, "  --machine-config=<path>        Machine description (YAML). Sets the number of\n");
+  fprintf(stderr, "                                 vector lanes, the scratchpad size and VLEN, so it\n");
+  fprintf(stderr, "                                 cannot be given with --vectorlane-size,\n");
+  fprintf(stderr, "                                 --scratchpad-size or --varch\n");
   exit(exit_code);
+}
+
+// What --machine-config hands on, and the three values Spike takes from it.
+struct machine_config_t
+{
+  // The top-level scalars of the first document, each as written in the file.
+  // A key whose value is null, a sequence or a mapping is not in it.
+  std::map<std::string, std::string> values;
+  uint64_t lanes;
+  uint64_t spad_kb_per_lane;
+  uint64_t vlen;
+};
+
+static void bad_machine_config(const char* path, const std::string& why)
+{
+  fprintf(stderr, "--machine-config=%s: %s\n", path, why.c_str());
+  exit(1);
+}
+
+// Spike needs all three keys; none of them has a default.
+static uint64_t machine_config_number(const char* path, const YAML::Node& root, const char* key)
+{
+  const YAML::Node value = root[key];
+  if (!value.IsDefined() || value.IsNull())
+    bad_machine_config(path, std::string("no value for ") + key);
+  try {
+    return value.as<uint64_t>();
+  } catch (const YAML::Exception& e) {
+    bad_machine_config(path, std::string(key) + " is not an unsigned number");
+  }
+  return 0;
+}
+
+static machine_config_t read_machine_config(const char* path)
+{
+  machine_config_t config;
+  try {
+    const std::vector<YAML::Node> documents = YAML::LoadAllFromFile(path);
+    const YAML::Node root = documents.empty() ? YAML::Node(YAML::NodeType::Map) : documents[0];
+    if (!root.IsMap())
+      bad_machine_config(path, "the top level of a machine description is a mapping");
+    for (const auto& entry : root)
+      if (entry.first.IsScalar() && entry.second.IsScalar())
+        config.values[entry.first.Scalar()] = entry.second.Scalar();
+    config.lanes = machine_config_number(path, root, "vpu_num_lanes");
+    config.spad_kb_per_lane = machine_config_number(path, root, "vpu_spad_size_kb_per_lane");
+    config.vlen = machine_config_number(path, root, "vpu_vector_length_bits");
+  } catch (const YAML::Exception& e) {
+    bad_machine_config(path, e.what());
+  }
+  return config;
 }
 
 static void suggest_help()
@@ -278,6 +337,11 @@ int main(int argc, char** argv)
   uint32_t vectorlane_size = 4;
   std::pair<reg_t, reg_t> kernel_addr;
   const char* base_path;
+  const char* machine_config_path = NULL;
+  // The options --machine-config replaces, when they were given.
+  std::vector<const char*> replaced_by_machine_config;
+  std::map<std::string, std::string> machine_config;
+  std::string varch_of_machine_config;
   const int debug_flag = get_env_flag("SPIKE_DEBUG", 0);
   const int sparse_flag = get_env_flag("SPIKE_SPARSE", 0);
 
@@ -358,7 +422,10 @@ int main(int argc, char** argv)
   parser.option(0, "log-cache-miss", 0, [&](const char* s){log_cache = true;});
   parser.option(0, "isa", 1, [&](const char* s){isa = s;});
   parser.option(0, "priv", 1, [&](const char* s){priv = s;});
-  parser.option(0, "varch", 1, [&](const char* s){varch = s;});
+  parser.option(0, "varch", 1, [&](const char* s){
+    varch = s;
+    replaced_by_machine_config.push_back("--varch");
+  });
   parser.option(0, "device", 1, device_parser);
   parser.option(0, "extension", 1, [&](const char* s){extensions.push_back(find_extension(s));});
   parser.option(0, "dump-dts", 0, [&](const char *s){dump_dts = true;});
@@ -406,17 +473,42 @@ int main(int argc, char** argv)
   });
   parser.option(0, "scratchpad-base-vaddr", 1,
       [&](const char* s){scratchpad_base_vaddr = atoul_safe(s);});
-  parser.option(0, "scratchpad-size", 1,
-      [&](const char* s){scratchpad_size = atoul_safe(s);});
-  parser.option(0, "vectorlane-size", 1,
-      [&](const char* s){vectorlane_size = atoul_safe(s);});
+  parser.option(0, "scratchpad-size", 1, [&](const char* s){
+    scratchpad_size = atoul_safe(s);
+    replaced_by_machine_config.push_back("--scratchpad-size");
+  });
+  parser.option(0, "vectorlane-size", 1, [&](const char* s){
+    vectorlane_size = atoul_safe(s);
+    replaced_by_machine_config.push_back("--vectorlane-size");
+  });
+  parser.option(0, "machine-config", 1,
+      [&](const char* s){machine_config_path = s;});
   parser.option(0, "kernel-addr", 1,
        [&](const char* s){kernel_addr = make_kernel_space_info(s);});
   parser.option(0, "base-path", 1,
        [&](const char* s){base_path = s;});
 
+  register_extension("vcixaccel", vcix_accel_extension);
+
   auto argv1 = parser.parse(argv);
   std::vector<std::string> htif_args(argv1, (const char*const*)argv + argc);
+  if (machine_config_path) {
+    // One source for each value: an option that sets the same thing is refused,
+    // not overridden.
+    if (!replaced_by_machine_config.empty())
+      bad_machine_config(machine_config_path, std::string("it sets what ") +
+                         replaced_by_machine_config[0] + " sets; give one of the two");
+    const machine_config_t config = read_machine_config(machine_config_path);
+    if (config.lanes > std::numeric_limits<uint32_t>::max())
+      bad_machine_config(machine_config_path, "vpu_num_lanes does not fit in 32 bits");
+    if (config.spad_kb_per_lane > std::numeric_limits<uint64_t>::max() / 1024)
+      bad_machine_config(machine_config_path, "vpu_spad_size_kb_per_lane does not fit in 64 bits as bytes");
+    vectorlane_size = config.lanes;
+    scratchpad_size = config.spad_kb_per_lane * 1024;
+    varch_of_machine_config = "vlen:" + std::to_string(config.vlen) + ",elen:64";
+    varch = varch_of_machine_config.c_str();
+    machine_config = config.values;
+  }
   if (mems.empty()) {
     reg_t main_mem_byte = 1<<30; // 1 GB
     reg_t base_addr = 0x80000000;
@@ -494,7 +586,8 @@ int main(int argc, char** argv)
 #ifdef HAVE_BOOST_ASIO
       io_service_ptr, acceptor_ptr,
 #endif
-      cmd_file, scratchpad_base_vaddr, scratchpad_size, vectorlane_size, kernel_addr, base_path);
+      cmd_file, scratchpad_base_vaddr, scratchpad_size, vectorlane_size, kernel_addr, base_path,
+      machine_config);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));

@@ -280,7 +280,8 @@ public:
               simif_t* sim, uint32_t id, bool halt_on_reset,
               FILE *log_file, std::ostream& sout_, uint32_t n_vu,
               std::pair<reg_t, reg_t> vu_sram_v_space,
-              std::pair<reg_t, reg_t> kernel_addr, uint64_t scratchpad_size_per_vu, const char *base_path); // because of command line option --log and -s we need both
+              std::pair<reg_t, reg_t> kernel_addr, uint64_t scratchpad_size_per_vu, const char *base_path,
+              const std::map<std::string, std::string>& machine_config); // because of command line option --log and -s we need both
   ~processor_t();
 
   void set_debug(bool value);
@@ -626,6 +627,9 @@ public:
 
   vectorUnit_t VU;
   const char *base_path;
+  // The machine description given with --machine-config: its top-level
+  // scalars, each as written in the file. Empty when none was given.
+  const std::map<std::string, std::string> machine_config;
 };
 
 reg_t illegal_instruction(processor_t* p, insn_t insn, reg_t pc);

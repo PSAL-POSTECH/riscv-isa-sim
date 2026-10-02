@@ -25,6 +25,8 @@ riscv_hdrs = \
 	mmio_plugin.h \
 	tracer.h \
 	extension.h \
+	vcix_accel.h \
+	vcix_accel_extension.h \
 	rocc.h \
 	insn_template.h \
 	debug_module.h \
@@ -50,6 +52,7 @@ riscv_srcs = \
 	disasm.cc \
 	extension.cc \
 	extensions.cc \
+	vcix_accel_extension.cc \
 	rocc.cc \
 	devices.cc \
 	rom.cc \

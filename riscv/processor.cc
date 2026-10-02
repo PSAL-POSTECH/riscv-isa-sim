@@ -27,11 +27,13 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
                          simif_t* sim, uint32_t id, bool halt_on_reset,
                          FILE* log_file, std::ostream& sout_, uint32_t n_vu,
                          std::pair<reg_t, reg_t> vu_sram_v_space,
-                         std::pair<reg_t, reg_t> kernel_addr, uint64_t scratchpad_size_per_vu, const char* base_path)
+                         std::pair<reg_t, reg_t> kernel_addr, uint64_t scratchpad_size_per_vu, const char* base_path,
+                         const std::map<std::string, std::string>& machine_config)
   : debug(false), halt_request(HR_NONE), sim(sim), id(id), xlen(0),
   histogram_enabled(false), log_commits_enabled(false), kernel_addr(kernel_addr),
   log_file(log_file), sout_(sout_.rdbuf()), n_vu(n_vu), halt_on_reset(halt_on_reset),
-  extension_table(256, false), impl_table(256, false), last_pc(1), executions(1), base_path(base_path)
+  extension_table(256, false), impl_table(256, false), last_pc(1), executions(1), base_path(base_path),
+  machine_config(machine_config)
 {
   VU.p = this;
   VU.n_vu = n_vu;
@@ -1087,9 +1089,29 @@ void processor_t::build_opcode_map()
     opcode_cache[i] = {0, 0, &illegal_instruction, &illegal_instruction};
 }
 
+// decode_insn takes the first entry that matches and moves entries as it runs,
+// so which of two overlapping encodings is executed is not defined. An
+// extension may not claim an encoding that is already implemented. Two
+// encodings overlap when they agree on every bit both of them fix.
+static void refuse_overlap(const insn_desc_t& claimed, const insn_desc_t& have)
+{
+  if (have.mask == 0) // the entry that makes everything else illegal
+    return;
+  if (((claimed.match ^ have.match) & claimed.mask & have.mask) != 0)
+    return;
+  fprintf(stderr, "an extension claims match 0x%" PRIx64 " mask 0x%" PRIx64
+          ", which overlaps an implemented instruction (match 0x%" PRIx64 " mask 0x%" PRIx64 ")\n",
+          (uint64_t)claimed.match, (uint64_t)claimed.mask, (uint64_t)have.match, (uint64_t)have.mask);
+  abort();
+}
+
 void processor_t::register_extension(extension_t* x)
 {
-  for (auto insn : x->get_instructions())
+  std::vector<insn_desc_t> claimed = x->get_instructions();
+  for (auto& insn : claimed)
+    for (auto& have : instructions)
+      refuse_overlap(insn, have);
+  for (auto& insn : claimed)
     register_insn(insn);
   build_opcode_map();
 
@@ -1107,6 +1129,10 @@ void processor_t::register_extension(extension_t* x)
 
 void processor_t::register_base_instructions()
 {
+  // An extension named in the ISA string is registered before the base
+  // instructions are, so what it claimed is checked here.
+  const std::vector<insn_desc_t> claimed = instructions;
+
   #define DECLARE_INSN(name, match, mask) \
     insn_bits_t name##_match = (match), name##_mask = (mask);
   #include "encoding.h"
@@ -1122,6 +1148,10 @@ void processor_t::register_base_instructions()
       rv64_##name});
   #include "insn_list.h"
   #undef DEFINE_INSN
+
+  for (auto& insn : claimed)
+    for (size_t i = claimed.size(); i < instructions.size(); i++)
+      refuse_overlap(insn, instructions[i]);
 
   register_insn({0, 0, &illegal_instruction, &illegal_instruction});
   build_opcode_map();
