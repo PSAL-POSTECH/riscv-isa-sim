@@ -66,6 +66,7 @@ program spad_4_next spad.S -DSPAD_BASE=$BASE -DSPAD_SIZE=0x80000 -DOFFSET=8
 program spad_8_moved spad.S -DSPAD_BASE=$MOVED -DSPAD_SIZE=0x100000
 program custom2 custom2.S -DVSET
 program custom2_vill custom2.S
+program custom2_frm custom2.S -DVSET -DFRM=3
 
 GOOD=("vpu_num_lanes: 8" "vpu_spad_size_kb_per_lane: $LANE_KB" "vpu_vector_length_bits: 256")
 yml good "vpu_num_lanes: 8" "vpu_spad_size_kb_per_lane: $LANE_KB" "vpu_vector_length_bits: 256" "unrelated: text"
@@ -161,13 +162,18 @@ count  "make two instances" 2 "[model] vpu_num_lanes"
 expect "custom-2 before any vsetvli is illegal" nonzero "An illegal instruction was executed!" "${ACCEL[@]}" "$(lib model)" "$PK" "$OUT/custom2_vill"
 count  "and does not reach the model" 0 "[model] execute"
 
+model read_csr -DREAD_CSR
+expect "the model reads frm and vtype as the program left them" 0 "[model] frm 3 vtype d0" "${ACCEL[@]}" "$(lib read_csr)" "$PK" "$OUT/custom2_frm"
+expect "and as they are when the program set no frm" 0 "[model] frm 0 vtype d0" "${ACCEL[@]}" "$(lib read_csr)" "$PK" "$OUT/custom2"
+
 # name|what is wrong|what Spike says
 for case in 'no_table|-DNO_TABLE|vcix_accel_model() returned no table' \
             'other_abi|-DABI=VCIX_ACCEL_ABI_VERSION+1|, Spike has ' \
             'no_execute|-DNO_EXECUTE|fork_test: create, destroy or execute is NULL' \
             'custom0|-DOPCODE=0x0b|is not in custom-1 or custom-2' \
             'bad_lane|-DBAD_LANE|vcixaccel: fork_test: asked for lane 4 of 4' \
-            'bad_register|-DBAD_REGISTER|vcixaccel: fork_test: asked for x register 32 of 32'; do
+            'bad_register|-DBAD_REGISTER|vcixaccel: fork_test: asked for x register 32 of 32' \
+            'bad_csr|-DBAD_CSR|vcixaccel: fork_test: asked for CSR 0x800, which this hart does not have'; do
   IFS='|' read -r name define says <<< "$case"
   model "$name" "$define"
   expect "a model built with $define is refused" 1 "$says" "${ACCEL[@]}" "$(lib "$name")" "$PK" "$OUT/custom2"

@@ -1,8 +1,11 @@
 # One instruction in custom-2, sf.vc.x 0x1, 0x2, 0x3, a0. With VSET it is given a
-# vtype first; without, vtype is still vill.
+# vtype first; without, vtype is still vill. With FRM, frm is set to it first.
     .text
     .globl main
 main:
+#ifdef FRM
+    csrwi   frm, FRM
+#endif
 #ifdef VSET
     li      t0, 8
     vsetvli t0, t0, e32, m1, ta, ma

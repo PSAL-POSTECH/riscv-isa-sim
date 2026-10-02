@@ -115,6 +115,15 @@ const vcix_host host_template = {
     check_index("f register", reg, NFPR);
     return proc(c)->get_state()->FPR[reg].v[0];
   },
+  // As the hart holds it, with no check of the privilege mode: a model is part
+  // of the machine, not of the program.
+  [](void* c, uint32_t csr) -> uint64_t {
+    auto& csrs = proc(c)->get_state()->csrmap;
+    auto found = csrs.find(csr);
+    if (found == csrs.end())
+      refuse("%s: asked for CSR 0x%x, which this hart does not have", model()->name, csr);
+    return found->second->read();
+  },
   [](void* c, uint64_t addr, void* dst, size_t bytes) {
     for (size_t i = 0; i < bytes; i++)
       static_cast<uint8_t*>(dst)[i] = proc(c)->get_mmu()->load_uint8(addr + i);

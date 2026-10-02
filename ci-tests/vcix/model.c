@@ -39,6 +39,14 @@ static void execute(void *self, const vcix_host *host, const vcix_insn *insn) {
 #ifdef BAD_REGISTER
   host->xreg_read(host->ctx, 32);
 #endif
+#ifdef READ_CSR
+  printf("[model] frm %llu vtype %llx\n", (unsigned long long)host->csr_read(host->ctx, 0x002),
+         (unsigned long long)host->csr_read(host->ctx, 0xc21));
+  fflush(stdout);
+#endif
+#ifdef BAD_CSR
+  host->csr_read(host->ctx, 0x800);
+#endif
 }
 
 static const vcix_model table = {
