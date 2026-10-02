@@ -39,9 +39,9 @@ void refuse(const char* fmt, ...)
   exit(1);
 }
 
-// The table of the model given with --extlib, after the checks a caller of
-// vcix_accel.h owes: nothing but abi_version is read from a table of another
-// version, and only `reset` may be NULL.
+// The table of the model given with --extlib. Nothing but abi_version is read
+// from a table of another version. Of the functions, the ones checked are the
+// ones Spike calls; the timing face is the timing simulator's to check.
 const vcix_model* load_model()
 {
   void* symbol = dlsym(RTLD_DEFAULT, "vcix_accel_model");
@@ -57,8 +57,8 @@ const vcix_model* load_model()
     refuse("%s has ABI %u, Spike has %u", lib, m->abi_version, VCIX_ACCEL_ABI_VERSION);
   if (!m->name)
     refuse("%s: the table has no name", lib);
-  if (!m->create || !m->destroy || !m->execute || !m->can_accept || !m->latency || !m->commit)
-    refuse("%s: %s: a member of the table other than reset is NULL", lib, m->name);
+  if (!m->create || !m->destroy || !m->execute)
+    refuse("%s: %s: create, destroy or execute is NULL", lib, m->name);
   if (m->num_encodings && !m->encodings)
     refuse("%s: %s: the table counts %zu encodings and has none", lib, m->name, m->num_encodings);
 

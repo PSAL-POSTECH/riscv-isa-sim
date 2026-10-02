@@ -75,16 +75,16 @@ static void help(int exit_code = 1)
   fprintf(stderr, "  --dm-no-hasel         Debug module supports hasel\n");
   fprintf(stderr, "  --dm-no-abstract-csr  Debug module won't support abstract to authenticate\n");
   fprintf(stderr, "  --dm-no-halt-groups   Debug module won't support halt groups\n");
-  fprintf(stderr, "  --scratchpad-base-vaddr=<addr> Scratchpad base virtual address\n");
+  fprintf(stderr, "  --scratchpad-base-vaddr=<addr> Scratchpad base virtual address [default 0xD0000000]\n");
   fprintf(stderr, "  --scratchpad-size=<size>       Scratchpad size\n");
   fprintf(stderr, "  --machine-config=<path>        Machine description (YAML). Sets the number of\n");
-  fprintf(stderr, "                                 vector lanes, the scratchpad size and VLEN, so it\n");
-  fprintf(stderr, "                                 cannot be given with --vectorlane-size,\n");
-  fprintf(stderr, "                                 --scratchpad-size or --varch\n");
+  fprintf(stderr, "                                 vector lanes, the scratchpad's size and base, and\n");
+  fprintf(stderr, "                                 VLEN, so it cannot be given with --vectorlane-size,\n");
+  fprintf(stderr, "                                 --scratchpad-size, --scratchpad-base-vaddr or --varch\n");
   exit(exit_code);
 }
 
-// What --machine-config hands on, and the three values Spike takes from it.
+// What --machine-config hands on, and the values Spike takes from it.
 struct machine_config_t
 {
   // The top-level scalars of the first document, each as written in the file.
@@ -93,7 +93,12 @@ struct machine_config_t
   uint64_t lanes;
   uint64_t spad_kb_per_lane;
   uint64_t vlen;
+  uint64_t spad_base_vaddr;
 };
+
+// The key under which a model finds --base-path. It belongs to a run and not
+// to the machine, so the file may not have it.
+static const char* const RUN_BASE_PATH_KEY = "run_base_path";
 
 static void bad_machine_config(const char* path, const std::string& why)
 {
@@ -101,12 +106,17 @@ static void bad_machine_config(const char* path, const std::string& why)
   exit(1);
 }
 
-// Spike needs all three keys; none of them has a default.
-static uint64_t machine_config_number(const char* path, const YAML::Node& root, const char* key)
+// The number under `key`. A key that is missing or null is an error, unless
+// there is a fallback for it.
+static uint64_t machine_config_number(const char* path, const YAML::Node& root, const char* key,
+                                      const uint64_t* fallback = NULL)
 {
   const YAML::Node value = root[key];
-  if (!value.IsDefined() || value.IsNull())
+  if (!value.IsDefined() || value.IsNull()) {
+    if (fallback)
+      return *fallback;
     bad_machine_config(path, std::string("no value for ") + key);
+  }
   try {
     return value.as<uint64_t>();
   } catch (const YAML::Exception& e) {
@@ -115,7 +125,8 @@ static uint64_t machine_config_number(const char* path, const YAML::Node& root, 
   return 0;
 }
 
-static machine_config_t read_machine_config(const char* path)
+// spad_base_vaddr is what the scratchpad's base is when the file does not say.
+static machine_config_t read_machine_config(const char* path, uint64_t spad_base_vaddr)
 {
   machine_config_t config;
   try {
@@ -129,6 +140,7 @@ static machine_config_t read_machine_config(const char* path)
     config.lanes = machine_config_number(path, root, "vpu_num_lanes");
     config.spad_kb_per_lane = machine_config_number(path, root, "vpu_spad_size_kb_per_lane");
     config.vlen = machine_config_number(path, root, "vpu_vector_length_bits");
+    config.spad_base_vaddr = machine_config_number(path, root, "vpu_spad_base_vaddr", &spad_base_vaddr);
   } catch (const YAML::Exception& e) {
     bad_machine_config(path, e.what());
   }
@@ -332,11 +344,11 @@ int main(int argc, char** argv)
     .support_impebreak = true
   };
   std::vector<int> hartids;
-  uint64_t scratchpad_base_vaddr = 0x0A000000;
+  uint64_t scratchpad_base_vaddr = 0xD0000000;
   uint64_t scratchpad_size = 128 << 10; // 128 KB
   uint32_t vectorlane_size = 4;
   std::pair<reg_t, reg_t> kernel_addr;
-  const char* base_path;
+  const char* base_path = NULL;
   const char* machine_config_path = NULL;
   // The options --machine-config replaces, when they were given.
   std::vector<const char*> replaced_by_machine_config;
@@ -471,8 +483,10 @@ int main(int argc, char** argv)
         exit(-1);
      }
   });
-  parser.option(0, "scratchpad-base-vaddr", 1,
-      [&](const char* s){scratchpad_base_vaddr = atoul_safe(s);});
+  parser.option(0, "scratchpad-base-vaddr", 1, [&](const char* s){
+    scratchpad_base_vaddr = atoul_safe(s);
+    replaced_by_machine_config.push_back("--scratchpad-base-vaddr");
+  });
   parser.option(0, "scratchpad-size", 1, [&](const char* s){
     scratchpad_size = atoul_safe(s);
     replaced_by_machine_config.push_back("--scratchpad-size");
@@ -498,17 +512,26 @@ int main(int argc, char** argv)
     if (!replaced_by_machine_config.empty())
       bad_machine_config(machine_config_path, std::string("it sets what ") +
                          replaced_by_machine_config[0] + " sets; give one of the two");
-    const machine_config_t config = read_machine_config(machine_config_path);
+    const machine_config_t config = read_machine_config(machine_config_path, scratchpad_base_vaddr);
     if (config.lanes > std::numeric_limits<uint32_t>::max())
       bad_machine_config(machine_config_path, "vpu_num_lanes does not fit in 32 bits");
     if (config.spad_kb_per_lane > std::numeric_limits<uint64_t>::max() / 1024)
       bad_machine_config(machine_config_path, "vpu_spad_size_kb_per_lane does not fit in 64 bits as bytes");
+    // What parse_varch_string requires, said here in terms of the key.
+    if (config.vlen < 64 || config.vlen > 4096 || (config.vlen & (config.vlen - 1)) != 0)
+      bad_machine_config(machine_config_path, "vpu_vector_length_bits is not a power of two from 64 to 4096");
+    if (config.values.count(RUN_BASE_PATH_KEY))
+      bad_machine_config(machine_config_path, std::string(RUN_BASE_PATH_KEY) +
+                         " is the key --base-path is handed on under; the file may not have it");
     vectorlane_size = config.lanes;
     scratchpad_size = config.spad_kb_per_lane * 1024;
+    scratchpad_base_vaddr = config.spad_base_vaddr;
     varch_of_machine_config = "vlen:" + std::to_string(config.vlen) + ",elen:64";
     varch = varch_of_machine_config.c_str();
     machine_config = config.values;
   }
+  if (base_path)
+    machine_config[RUN_BASE_PATH_KEY] = base_path;
   if (mems.empty()) {
     reg_t main_mem_byte = 1<<30; // 1 GB
     reg_t base_addr = 0x80000000;
@@ -526,7 +549,7 @@ int main(int argc, char** argv)
     for (auto& m : mems) {
       printf("MEM >> Base Addr: 0x%lx:0x%lx, Size: 0x%lx\n", m.first, m.first + m.second->size()-1, m.second->size());
     }
-    printf("Base path: %s\n", base_path);
+    printf("Base path: %s\n", base_path ? base_path : "(none)");
   }
   if (!*argv1)
     help();
