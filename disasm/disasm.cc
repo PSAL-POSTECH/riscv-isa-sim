@@ -773,24 +773,6 @@ disassembler_t::disassembler_t(int xlen)
   DEFINE_RTYPE(sub);
   DEFINE_RTYPE(sll);
   DEFINE_RTYPE(slt);
-  DEFINE_RTYPE(torchsim_mvin);
-  DEFINE_RTYPE(torchsim_mvin2);
-  DEFINE_RTYPE(torchsim_mvin3);
-  DEFINE_RTYPE(torchsim_mvout);
-  DEFINE_RTYPE(torchsim_i_vpush);
-  DEFINE_RTYPE(torchsim_w_vpush);
-  DEFINE_RTYPE(torchsim_vpop);
-  DEFINE_RTYPE(torchsim_compute);
-  DEFINE_RTYPE(torchsim_vexp);
-  // Hands-on: Add vexp2 here
-  //DEFINE_RTYPE(torchsim_vexp2);
-  DEFINE_RTYPE(torchsim_verf);
-  DEFINE_RTYPE(torchsim_vtanh);
-  DEFINE_RTYPE(torchsim_vlog);
-  DEFINE_RTYPE(torchsim_vatan);
-  DEFINE_RTYPE(torchsim_vsin);
-  DEFINE_RTYPE(torchsim_vcos);
-  DEFINE_RTYPE(torchsim_vlane_idx);
   add_insn(new disasm_insn_t("snez", match_sltu, mask_sltu | mask_rs1, {&xrd, &xrs2}));
   DEFINE_RTYPE(sltu);
   DEFINE_RTYPE(xor);

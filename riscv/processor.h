@@ -15,8 +15,6 @@
 #include "debug_rom_defines.h"
 #include "entropy_source.h"
 #include "csrs.h"
-#include "systolic_array.h"
-#include "cross_lane_unit.h"
 
 class processor_t;
 class mmu_t;
@@ -25,8 +23,6 @@ class simif_t;
 class trap_t;
 class extension_t;
 class disassembler_t;
-class systolicArray_t;
-class crossLaneUnit_t;
 
 struct insn_desc_t
 {
@@ -283,7 +279,7 @@ public:
   processor_t(const char* isa, const char* priv, const char* varch,
               simif_t* sim, uint32_t id, bool halt_on_reset,
               FILE *log_file, std::ostream& sout_, uint32_t n_vu,
-              std::pair<reg_t, reg_t> vu_sram_p_space, std::pair<reg_t, reg_t> vu_sram_v_space,
+              std::pair<reg_t, reg_t> vu_sram_v_space,
               std::pair<reg_t, reg_t> kernel_addr, uint64_t scratchpad_size_per_vu, const char *base_path); // because of command line option --log and -s we need both
   ~processor_t();
 
@@ -317,8 +313,6 @@ public:
   }
   extension_t* get_extension();
   extension_t* get_extension(const char* name);
-  systolicArray_t* get_systolicArray() { return SA; }
-  crossLaneUnit_t* get_crossLaneUnit() { return XLU; }
   bool any_custom_extensions() const {
     return !custom_extensions.empty();
   }
@@ -550,15 +544,7 @@ public:
       bool vill;
       bool vstart_alu;
       reg_t n_vu;
-      std::pair<reg_t, reg_t> sram_p_space;
       std::pair<reg_t, reg_t> sram_v_space;
-
-      // Config called for every dma operation
-      uint64_t dma_counter = 0;
-      // For indirect access
-      uint64_t dma_indirect_counter = 0;
-      reg_t dma_desc_ptr = 0;                // TMA-style DMA descriptor base (MVIN/MVOUT read the struct)
-
 
       // VU SRAM
       reg_t vu_sram_byte = 0;
@@ -639,8 +625,6 @@ public:
   };
 
   vectorUnit_t VU;
-  systolicArray_t *SA;
-  crossLaneUnit_t *XLU;
   const char *base_path;
 };
 

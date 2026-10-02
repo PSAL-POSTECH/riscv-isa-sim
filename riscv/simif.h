@@ -19,9 +19,12 @@ public:
 
   virtual const char* get_symbol(uint64_t addr) = 0;
 
-  virtual uint64_t get_spad_paddr() = 0;
+  // The scratchpad: get_spad_size() bytes that programs see at
+  // get_spad_vaddr(). It is the simulator's own buffer and has no physical
+  // address; spad_to_mem takes an offset into it.
   virtual uint64_t get_spad_vaddr() = 0;
   virtual uint64_t get_spad_size() = 0;
+  virtual char* spad_to_mem(reg_t offset) = 0;
 };
 
 #endif

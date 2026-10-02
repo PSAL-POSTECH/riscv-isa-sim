@@ -99,10 +99,8 @@ public:
   // Todo: Need to make VU SRAM address space configurable
   #define load_func(type, prefix, xlate_flags) \
     inline type##_t prefix##_##type(reg_t addr, bool require_alignment = false) { \
-      if (addr >= sim->get_spad_vaddr() && addr < sim->get_spad_vaddr() + sim->get_spad_size()) { \
-        reg_t offset = addr - sim->get_spad_vaddr(); \
-        reg_t pa = offset + sim->get_spad_paddr(); \
-        auto host_addr = sim->addr_to_mem(pa); \
+      if (in_spad(addr, sizeof(type##_t))) { \
+        auto host_addr = sim->spad_to_mem(addr - sim->get_spad_vaddr()); \
         type##_t data = from_target(*(target_endian<type##_t>*)host_addr); \
         return data; \
       } \
@@ -169,17 +167,10 @@ public:
   // Todo: Need to make VU SRAM address space configurable
   #define store_func(type, prefix, xlate_flags) \
     void prefix##_##type(reg_t addr, type##_t val) { \
-      if (addr >= sim->get_spad_vaddr() && addr < sim->get_spad_vaddr() + sim->get_spad_size()) { \
-        reg_t offset = addr - sim->get_spad_vaddr(); \
-        reg_t pa = offset + sim->get_spad_paddr(); \
+      if (in_spad(addr, sizeof(type##_t))) { \
         target_endian<type##_t> target_val = to_target(val); \
-        if (auto host_addr = sim->addr_to_mem(pa)) { \
-          memcpy(host_addr, (uint8_t *)&target_val, sizeof(target_val)); \
-          return; \
-        } else { \
-          mmio_store(pa, sizeof(target_val), (uint8_t *)&target_val); \
-          return; \
-        } \
+        memcpy(sim->spad_to_mem(addr - sim->get_spad_vaddr()), (uint8_t *)&target_val, sizeof(target_val)); \
+        return; \
       } \
       if (unlikely(addr & (sizeof(type##_t)-1))) \
         return misaligned_store(addr, val, sizeof(type##_t), xlate_flags); \
@@ -411,7 +402,14 @@ public:
   }
 
   reg_t get_spad_base_vaddr() { return sim->get_spad_vaddr(); }
-  reg_t get_spad_base_paddr() { return sim->get_spad_paddr(); }
+
+  // Whether an access of len bytes at addr lies wholly in the scratchpad. One
+  // that does is served from the simulator's buffer, without translation.
+  bool in_spad(reg_t addr, size_t len) {
+    reg_t base = sim->get_spad_vaddr();
+    reg_t size = sim->get_spad_size();
+    return addr >= base && addr - base < size && len <= size - (addr - base);
+  }
 
 private:
   simif_t* sim;

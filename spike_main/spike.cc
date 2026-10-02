@@ -71,7 +71,6 @@ static void help(int exit_code = 1)
   fprintf(stderr, "  --dm-no-hasel         Debug module supports hasel\n");
   fprintf(stderr, "  --dm-no-abstract-csr  Debug module won't support abstract to authenticate\n");
   fprintf(stderr, "  --dm-no-halt-groups   Debug module won't support halt groups\n");
-  fprintf(stderr, "  --scratchpad-base-paddr=<addr> Scratchpad base physical address\n");
   fprintf(stderr, "  --scratchpad-base-vaddr=<addr> Scratchpad base virtual address\n");
   fprintf(stderr, "  --scratchpad-size=<size>       Scratchpad size\n");
   exit(exit_code);
@@ -229,27 +228,6 @@ static int get_env_flag(const char *env, int default_val) {
   return env_val ? std::stoi(env_val) : default_val;
 }
 
-void dump_core_cycletime(sim_t *s, const char* path) {
-  std::vector<reg_t> *cycles = s->get_core(0)->get_systolicArray()->get_compute_cycles();
-  const uint32_t n_outerloops = cycles->size();
-
-  if (get_env_flag("SPIKE_DEBUG", 0))
-    printf("Number of outerloops: %d\n", n_outerloops);
-  for (uint32_t i = 0; i < n_outerloops; i++)
-    printf("Core cycle time: %ld\n", cycles->at(i));
-
-  std::string dump_path = std::string(path) + "/spike_core_cycletime.txt";
-  FILE *fp = fopen(dump_path.c_str(), "w");
-  if (fp == NULL) {
-    fprintf(stderr, "Unable to open file '%s'\n", dump_path.c_str());
-    exit(-1);
-  }
-  for (uint32_t i = 0; i < n_outerloops; i++) {
-    fprintf(fp, "%ld\n", cycles->at(i));
-  }
-  fclose(fp);
-}
-
 int main(int argc, char** argv)
 {
   bool debug = false;
@@ -295,7 +273,6 @@ int main(int argc, char** argv)
     .support_impebreak = true
   };
   std::vector<int> hartids;
-  uint64_t scratchpad_base_paddr = 0xC0000000;
   uint64_t scratchpad_base_vaddr = 0x0A000000;
   uint64_t scratchpad_size = 128 << 10; // 128 KB
   uint32_t vectorlane_size = 4;
@@ -427,8 +404,6 @@ int main(int argc, char** argv)
         exit(-1);
      }
   });
-  parser.option(0, "scratchpad-base-paddr", 1,
-      [&](const char* s){scratchpad_base_paddr = atoul_safe(s);});
   parser.option(0, "scratchpad-base-vaddr", 1,
       [&](const char* s){scratchpad_base_vaddr = atoul_safe(s);});
   parser.option(0, "scratchpad-size", 1,
@@ -446,16 +421,15 @@ int main(int argc, char** argv)
     reg_t main_mem_byte = 1<<30; // 1 GB
     reg_t base_addr = 0x80000000;
     char mem_opt[100];
-    sprintf(mem_opt, "0x%lx:0x%lx,0x%lx:0x%lx", base_addr, main_mem_byte, scratchpad_base_paddr,
-      scratchpad_size*vectorlane_size);
+    sprintf(mem_opt, "0x%lx:0x%lx", base_addr, main_mem_byte);
     if (debug_flag)
       printf("mem opt > %s\n", mem_opt);
     mems = make_mems(mem_opt);
   }
   if (debug_flag) {
     printf("Number of vectorlane: %d\n", vectorlane_size);
-    printf("Scratchpad base physical address: 0x%lx\n", scratchpad_base_paddr);
     printf("Scratchpad base virtual address: 0x%lx\n", scratchpad_base_vaddr);
+    printf("Scratchpad size: 0x%lx\n", scratchpad_size*vectorlane_size);
     printf("Kernel addr: 0x%lx, 0x%lx\n", kernel_addr.first, kernel_addr.second);
     for (auto& m : mems) {
       printf("MEM >> Base Addr: 0x%lx:0x%lx, Size: 0x%lx\n", m.first, m.first + m.second->size()-1, m.second->size());
@@ -520,7 +494,7 @@ int main(int argc, char** argv)
 #ifdef HAVE_BOOST_ASIO
       io_service_ptr, acceptor_ptr,
 #endif
-      cmd_file, scratchpad_base_paddr, scratchpad_base_vaddr, scratchpad_size, vectorlane_size, kernel_addr, base_path);
+      cmd_file, scratchpad_base_vaddr, scratchpad_size, vectorlane_size, kernel_addr, base_path);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));
@@ -551,9 +525,6 @@ int main(int argc, char** argv)
   s.set_histogram(histogram);
 
   auto return_code = s.run();
-
-  // if (sparse_flag)
-  //   dump_core_cycletime(&s, base_path);
 
   for (auto& mem : mems)
     delete mem.second;

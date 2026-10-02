@@ -26,7 +26,7 @@
 processor_t::processor_t(const char* isa, const char* priv, const char* varch,
                          simif_t* sim, uint32_t id, bool halt_on_reset,
                          FILE* log_file, std::ostream& sout_, uint32_t n_vu,
-                         std::pair<reg_t, reg_t> vu_sram_p_space, std::pair<reg_t, reg_t> vu_sram_v_space,
+                         std::pair<reg_t, reg_t> vu_sram_v_space,
                          std::pair<reg_t, reg_t> kernel_addr, uint64_t scratchpad_size_per_vu, const char* base_path)
   : debug(false), halt_request(HR_NONE), sim(sim), id(id), xlen(0),
   histogram_enabled(false), log_commits_enabled(false), kernel_addr(kernel_addr),
@@ -35,12 +35,8 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
 {
   VU.p = this;
   VU.n_vu = n_vu;
-  VU.sram_p_space = vu_sram_p_space;
   VU.sram_v_space = vu_sram_v_space;
   VU.vu_sram_byte = scratchpad_size_per_vu;
-  SA = new systolicArray_t(this, n_vu);
-  XLU = new crossLaneUnit_t(this, n_vu);
-  //printf("VU sram_p_space > %lx %lx\n", vu_sram_p_space.first, vu_sram_p_space.second);
   //printf("VU sram_v_space > %lx %lx\n", vu_sram_v_space.first, vu_sram_v_space.second);
   parse_isa_string(isa);
   parse_priv_string(priv);
@@ -76,8 +72,6 @@ processor_t::~processor_t()
   }
 #endif
   
-  delete SA;
-  delete XLU;
   delete mmu;
   delete disassembler;
 }
@@ -673,8 +667,6 @@ void processor_t::reset()
   state.dcsr->halt = halt_on_reset;
   halt_on_reset = false;
   VU.reset();
-  SA->reset();
-  XLU->reset();
 
   if (n_pmp > 0) {
     // For backwards compatibility with software that is unaware of PMP,
