@@ -84,16 +84,6 @@ enum VRM{
   INVALID_RM
 };
 
-/* Says whether SEW=8 at the systolic array boundary is an integer or an fp8 --
-   a question vtype cannot answer, because one push instruction takes both. WHICH
-   fp8 it is comes from vtype's altfmt; the two named values are kept for
-   descriptors written before that moved. Carried in DMA descriptor byte 117. */
-enum ELEM_DTYPE{
-  ELEM_DTYPE_INT = 0,
-  ELEM_DTYPE_FP8E4M3 = 1,
-  ELEM_DTYPE_FP8E5M2 = 2
-};
-
 template<uint64_t N>
 struct type_usew_t;
 
@@ -561,8 +551,6 @@ public:
       bool vstart_alu;
       reg_t n_vu;
       std::pair<reg_t, reg_t> sram_v_space;
-
-      reg_t elem_dtype = ELEM_DTYPE_INT;     // descriptor byte 117; see enum ELEM_DTYPE
 
       // VU SRAM
       reg_t vu_sram_byte = 0;
