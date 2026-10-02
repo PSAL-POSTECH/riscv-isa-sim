@@ -1,0 +1,20 @@
+yaml-cpp 0.8.0, copied into the tree so that Spike reads a machine description
+(--machine-config) without depending on a library of the host.
+
+Source:  https://github.com/jbeder/yaml-cpp, tag 0.8.0
+         (commit f7320141120f720aecc4c32be25586e7da9eb978)
+License: MIT, see LICENSE
+
+What was copied, and how it differs from the tag:
+  - src/*.cpp as *.cc, the suffix this build system compiles. Contents unchanged.
+  - src/*.h, unchanged.
+  - include/yaml-cpp/ as yaml-cpp/, unchanged, so "yaml-cpp/yaml.h" is found
+    with this directory on the include path.
+  - Left out: src/contrib and include/yaml-cpp/contrib (the graph builder,
+    which nothing else in the library uses), tests, tools, docs, and the CMake
+    and Bazel files.
+
+yaml_cpp.mk.in and yaml_cpp.ac are Spike's, not yaml-cpp's.
+
+To move to another version: copy the same files from the new tag, rename
+*.cpp to *.cc, and update the lists in yaml_cpp.mk.in.

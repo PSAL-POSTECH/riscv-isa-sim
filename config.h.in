@@ -140,3 +140,6 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
+
+/* Define if subproject MCPPBS_SPROJ_NORM is enabled */
+#undef YAML_CPP_ENABLED
