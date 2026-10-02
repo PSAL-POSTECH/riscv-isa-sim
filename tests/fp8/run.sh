@@ -55,7 +55,7 @@ RESOLVED=$(ldd "$DRIVER" | awk '/libsoftfloat\.so/ {print $3}')
 echo "libsoftfloat.so -> $RESOLVED"
 MISSING=""
 for sym in f8_to_f32 f32_to_f8 f8_add f8_div f8_lt softfloat_fp8Format; do
-    nm -D --defined-only "$RESOLVED" 2>/dev/null | grep -qw "$sym" || MISSING="$MISSING $sym"
+    grep -qw "$sym" <(nm -D --defined-only "$RESOLVED" 2>/dev/null) || MISSING="$MISSING $sym"
 done
 if [ -n "$MISSING" ]; then
     echo "run.sh: the loaded libsoftfloat.so is missing fp8 symbols:$MISSING" >&2

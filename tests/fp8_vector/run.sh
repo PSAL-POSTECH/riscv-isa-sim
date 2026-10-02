@@ -36,7 +36,7 @@ ${CC:-cc} -O2 -std=gnu11 -Wall -Wextra -I"$HERE" -I"$ROOT/softfloat" \
 
 RESOLVED=$(ldd "$HERE/ref" | awk '/libsoftfloat\.so/ {print $3}')
 for sym in f8_add f8_mulAdd f8_recip7 f16_to_f8; do
-    nm -D --defined-only "$RESOLVED" 2>/dev/null | grep -qw "$sym" \
+    grep -qw "$sym" <(nm -D --defined-only "$RESOLVED" 2>/dev/null) \
         || die "loaded libsoftfloat.so ($RESOLVED) lacks $sym -- stale library"
 done
 echo "libsoftfloat.so -> $RESOLVED"
@@ -46,7 +46,7 @@ echo "=== 2/6 run on spike ==="
 "$SPIKE" --isa="$ISA" "$PK" "$HERE/target" > "$OUT"
 srv=$?
 [ $srv -eq 0 ] || die "target exited $srv -- an instruction trapped"
-tail -c 12 "$OUT" | grep -q ENDFP8VEC || die "stream truncated"
+grep -q ENDFP8VEC <(tail -c 12 "$OUT") || die "stream truncated"
 echo "wrote $OUT ($(stat -c %s "$OUT") bytes), stream terminated cleanly"
 
 echo
@@ -72,7 +72,7 @@ FP8V_MUTATE=1000 FP8V_MAX_REPORT=0 "$HERE/ref" "$OUT" >/dev/null 2>&1
              || { echo "  BAD  oracle passed a mutated expectation"; nc_ok=0; }
 "$SPIKE" --isa="$ISA" "$PK" "$HERE/target_sab" > "$HERE/sabotage.bin" 2>/dev/null
 sab=$("$HERE/ref" "$HERE/sabotage.bin" 2>/dev/null)
-if echo "$sab" | grep -q "^vfsub.vv .*FAIL"; then
+if grep -q "^vfsub.vv .*FAIL" <<< "$sab"; then
     echo "  ok   ref catches vfsub.vv built with swapped operands"
 else
     echo "  BAD  swapped-operand vfsub.vv went unnoticed"; nc_ok=0
@@ -104,7 +104,7 @@ for c in $CASES; do
     $CROSS $CFLAGS_T -DT=$t "$HERE/traps.c" -o "$HERE/trap_bin" 2>/dev/null \
         || die "traps.c T=$t build failed"
     got=$("$SPIKE" --isa="$isa" "$PK" "$HERE/trap_bin" 2>&1)
-    if echo "$got" | grep -q "AFTER"; then have=run; else have=trap; fi
+    if grep -q "AFTER" <<< "$got"; then have=run; else have=trap; fi
     if [ "$have" = "$want" ]; then
         printf "  ok   %-32s isa=%-20s %s\n" "$nm" "$isa" "$have"
     else
