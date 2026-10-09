@@ -84,12 +84,15 @@ uint64_t d_vlane_idx_stride = dma_buffer_stride[vlane_split_axis] * vlane_stride
 uint64_t d_outerloop_idx_stride = d_vlane_idx_stride * used_vlane;
 uint64_t s_outerloop_idx_stride = block_stride[vlane_split_axis] * vlane_stride;
 
-void *dma_buffer = nullptr;
+// Release the address buffer even if an MMU access throws a trap.
+std::unique_ptr<uint64_t[]> dma_buffer;
+
 try {
-    dma_buffer = new uint64_t[buffer_size]();   // zero-init: ROUNDUP padding entries stay 0 -> skipped
+	// Keep padding entries zero so the store loop skips them.
+	dma_buffer.reset(new uint64_t[buffer_size]());
 } catch (const std::bad_alloc& e) {
-    std::cerr << "Memory allocation failed: " << e.what() << std::endl;
-    assert(false);
+	std::cerr << "Memory allocation failed: " << e.what() << std::endl;
+	assert(false);
 }
 
 if (debug_flag) {
@@ -137,7 +140,7 @@ for (uint64_t n=0; n<p_dim_size[0]; n++) {
                     (int64_t)c >= desc_dim_low[1] && (int64_t)c < desc_dim_high[1] &&
                     (int64_t)h >= desc_dim_low[2] && (int64_t)h < desc_dim_high[2] &&
                     (int64_t)w >= desc_dim_low[3] && (int64_t)w < desc_dim_high[3]);
-                static_cast<uint64_t*>(dma_buffer)[buffer_idx] = in_box ? d_addr : 0;
+                dma_buffer[buffer_idx] = in_box ? d_addr : 0;
             }
         }
     }
@@ -152,7 +155,7 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
                         uint64_t d_idx = d_outerloop_idx_stride * outerloop_idx + d_vlane_idx_stride * vlane_idx + dma_buffer_stride[N] * n + dma_buffer_stride[C] * c + dma_buffer_stride[H] * h + dma_buffer_stride[W] * w ;
                         uint64_t s_idx = (s_outerloop_idx_stride * outerloop_idx + block_stride[N] * n + block_stride[C] * c + block_stride[H] * h + block_stride[W] * w);
                         uint64_t s_addr = scratchpadAddr + s_idx * element_size + vlane_idx * P.VU.vu_sram_byte;
-                        uint64_t d_addr = static_cast<uint64_t*>(dma_buffer)[d_idx];
+                        uint64_t d_addr = dma_buffer[d_idx];
 
                         /* Skip if the dram_addr is not defined */
                         if (d_addr == 0)
@@ -261,10 +264,8 @@ for (uint64_t outerloop_idx=0; outerloop_idx<n_outerloop; outerloop_idx++) {
     }
 }
 
-if (dma_buffer != nullptr) {
-    delete [] static_cast<uint64_t*>(dma_buffer);
-    dma_buffer = nullptr;
-}
+// Release on success; RAII handles exceptional exits.
+dma_buffer.reset();
 
 if (desc_indirect) {
     std::string file_path = std::string(P.base_path) + "/indirect_access/indirect_index" + std::to_string(P.VU.dma_indirect_counter++) + ".raw";
