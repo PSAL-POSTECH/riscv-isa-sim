@@ -1432,6 +1432,8 @@ disassembler_t::disassembler_t(int xlen)
 
   DISASM_VFUNARY0_INSN(vfn, w);
   DEFINE_VECTOR_V(vfncvt_f_f_w);
+  DEFINE_VECTOR_V(vfwcvtbf16_f_f_v);
+  DEFINE_VECTOR_V(vfncvtbf16_f_f_w);
   DEFINE_VECTOR_V(vfncvt_rod_f_f_w);
 
   //vfunary1
