@@ -2695,14 +2695,15 @@ reg_t index[P.VU.vlmax]; \
 // Used by VI_VFP_CVT_SCALE only, where vsew names the *narrow* side of a
 // widen/narrow convert.  Its e8 arm is an 8-bit integer operand paired with an
 // f16 float side, so it is gated on Zfh -- it is not fp8 and Zvfp8 has no say.
-/* At e8 this macro's narrow side is either an 8-bit integer beside f16 (needs
-   Zfh) or an fp8 (needs Zvfp8). Admit both here; every instruction's own CHECK8
-   already requires the one it actually uses, so the pair stays exact. */
+/* At e8 the narrow side is an 8-bit integer beside f16 (Zfh) or an fp8 (Zvfp8
+   or Zvfofp8min). Admit all; each instruction's own CHECK8 requires the one it
+   actually uses, so the gate stays exact. */
 #define VI_VFP_LOOP_SCALE_BASE \
   require_fp; \
   require_vector(true);\
   require((P.VU.vsew == e8 && (p->extension_enabled(EXT_ZFH) || \
-                               p->extension_enabled(EXT_ZVFP8))) || \
+                               p->extension_enabled(EXT_ZVFP8) || \
+                               p->extension_enabled(EXT_ZVFOFP8MIN))) || \
           (P.VU.vsew == e16 && p->extension_enabled('F')) || \
           (P.VU.vsew == e32 && p->extension_enabled('D'))); \
   require(STATE.frm->read() < 0x5);\

@@ -234,6 +234,7 @@ typedef enum {
   EXT_ZFHMIN,
   EXT_ZVFP8,
   EXT_ZVFBFMIN,
+  EXT_ZVFOFP8MIN,
   EXT_ZBA,
   EXT_ZBB,
   EXT_ZBC,
