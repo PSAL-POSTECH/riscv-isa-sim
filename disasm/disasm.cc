@@ -1434,6 +1434,9 @@ disassembler_t::disassembler_t(int xlen)
   DEFINE_VECTOR_V(vfncvt_f_f_w);
   DEFINE_VECTOR_V(vfwcvtbf16_f_f_v);
   DEFINE_VECTOR_V(vfncvtbf16_f_f_w);
+  DEFINE_VECTOR_V(vfncvtbf16_sat_f_f_w);
+  DEFINE_VECTOR_V(vfncvt_f_f_q);
+  DEFINE_VECTOR_V(vfncvt_sat_f_f_q);
   DEFINE_VECTOR_V(vfncvt_rod_f_f_w);
 
   //vfunary1
