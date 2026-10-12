@@ -114,3 +114,8 @@ float8_t f32_to_f8( float32_t a )
 {
     return softfloat_f32ToF8( a, false );
 }
+
+float8_t f32_to_f8_sat( float32_t a )
+{
+    return softfloat_f32ToF8( a, true );
+}

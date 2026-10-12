@@ -168,6 +168,7 @@ int_fast64_t f8_to_i64_r_minMag( float8_t, bool );
 float16_t f8_to_f16( float8_t );
 float32_t f8_to_f32( float8_t );
 float64_t f8_to_f64( float8_t );
+bfloat16_t f8_to_bf16( float8_t );
 float8_t f8_roundToInt( float8_t, uint_fast8_t, bool );
 float8_t f8_add( float8_t, float8_t );
 float8_t f8_sub( float8_t, float8_t );
@@ -198,6 +199,9 @@ float8_t i32_to_f8( int32_t );
 float8_t i64_to_f8( int64_t );
 float8_t f16_to_f8( float16_t );
 float8_t f32_to_f8( float32_t );
+float8_t f32_to_f8_sat( float32_t );
+float8_t bf16_to_f8( bfloat16_t );
+float8_t bf16_to_f8_sat( bfloat16_t );
 float8_t f64_to_f8( float64_t );
 
 /*----------------------------------------------------------------------------
