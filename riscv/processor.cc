@@ -267,6 +267,11 @@ void processor_t::parse_isa_string(const char* str)
       if (!((max_isa >> ('v' - 'a')) & 1))
         bad_isa_string(str, "'zvfp8' extension requires 'V'");
       extension_table[EXT_ZVFP8] = true;
+      extension_table[EXT_ZVFOFP8MIN] = true;
+    } else if (ext_str == "zvfofp8min") {
+      if (!((max_isa >> ('v' - 'a')) & 1))
+        bad_isa_string(str, "'zvfofp8min' extension requires 'V'");
+      extension_table[EXT_ZVFOFP8MIN] = true;
     } else if (ext_str == "zvfbfmin") {
       if (!((max_isa >> ('v' - 'a')) & 1))
         bad_isa_string(str, "'zvfbfmin' extension requires 'V'");
@@ -620,7 +625,9 @@ reg_t processor_t::vectorUnit_t::set_vl(int rd, int rs1, reg_t reqVL, reg_t newT
 
     vill = !(vflmul >= 0.125 && vflmul <= 8)
            || vsew > std::min(vflmul, 1.0f) * ELEN
-           || (newType >> 9) != 0;
+           || (newType >> 9) != 0
+           || (altfmt && !(vsew == 8 && (p->extension_enabled(EXT_ZVFOFP8MIN) ||
+                                         p->extension_enabled(EXT_ZVFP8))));
 
     if (vill) {
       vlmax = 0;
