@@ -590,7 +590,7 @@ def _narrow16(u16, mode):
     if a.is_nan:
         return f.nan_ui, 0
     if a.kind == "inf":
-        return (0x80 if a.sign else 0) | f.inf_ui, 0
+        return f.inf_result(a.sign), 0
     return O.round_to_f8(a.sign, a.num, a.den, E4M3, mode)
 
 
@@ -603,7 +603,7 @@ def _narrow16_rod(u16):
     if a.is_nan:
         return f.nan_ui, 0
     if a.kind == "inf":
-        return (0x80 if a.sign else 0) | f.inf_ui, 0
+        return f.inf_result(a.sign), 0
     down, fl_d = O.round_to_f8(a.sign, a.num, a.den, E4M3, O.RTZ)
     if not (fl_d & NX):
         return down, fl_d
