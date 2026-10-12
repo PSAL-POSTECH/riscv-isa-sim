@@ -44,14 +44,14 @@ uint_fast16_t f8_classify( float8_t a )
 
 /*----------------------------------------------------------------------------
 | An infinite estimate, in a format that may have no infinity:  E4M3 lands on
-| S.1111.111, the same encoding f32_to_f8 gives infinity and overflow.
+| the canonical NaN 0x7F, the same encoding f32_to_f8 gives infinite results.
 *----------------------------------------------------------------------------*/
 static uint_fast8_t f8_infUI( bool sign )
 {
 
     return
-        ((uint_fast8_t) sign<<7)
-            | (softfloat_fp8Format == softfloat_fp8_e4m3 ? 0x7F : 0x7C);
+        softfloat_fp8Format == softfloat_fp8_e4m3
+            ? defaultNaNF8E4M3UI : (((uint_fast8_t) sign<<7) | 0x7C);
 }
 
 /*----------------------------------------------------------------------------

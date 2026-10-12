@@ -42,11 +42,16 @@ class Format:
         self.maxfin_ui = maxfin_ui
         self.has_inf = has_inf
 
+    def inf_result(self, sign):
+        """An infinite result: signed infinity, or for E4M3 the canonical NaN."""
+        return ((0x80 if sign else 0) | self.inf_ui) if self.has_inf \
+            else self.nan_ui
+
 
 FORMATS = {
     E4M3: Format(E4M3, mant=3, bias=7, emin=-6, maxfin=(14, 5), nan_ui=0x7F,
                  inf_ui=0x7F, maxfin_ui=0x7E, has_inf=False),
-    E5M2: Format(E5M2, mant=2, bias=15, emin=-14, maxfin=(7, 13), nan_ui=0x7E,
+    E5M2: Format(E5M2, mant=2, bias=15, emin=-14, maxfin=(7, 13), nan_ui=0x7F,
                  inf_ui=0x7C, maxfin_ui=0x7B, has_inf=True),
 }
 
@@ -156,7 +161,7 @@ def _round_to_f8(sign, num, den, fmt_code, mode, tininess_after):
 
     if _gt_dyadic(n, q, *f.maxfin):
         away = _overflow_goes_to_inf(mode, sign)
-        return sbit | (f.inf_ui if away else f.maxfin_ui), OF | NX
+        return (f.inf_result(sign) if away else sbit | f.maxfin_ui), OF | NX
 
     flags = NX if inexact else 0
     if tiny and inexact:
@@ -238,7 +243,7 @@ def decode_f32(bits):
 # ---------------------------------------------------------------------------
 
 def _inf(fmt_code, sign):
-    return (0x80 if sign else 0) | FORMATS[fmt_code].inf_ui
+    return FORMATS[fmt_code].inf_result(sign)
 
 
 def _nan(fmt_code):

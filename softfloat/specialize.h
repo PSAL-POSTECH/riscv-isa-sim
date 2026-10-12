@@ -94,11 +94,11 @@ extern "C" {
 struct commonNaN { char _unused; };
 
 /*----------------------------------------------------------------------------
-| Default generated 8-bit NaN.  E4M3 has no infinities and S.1111.111 is its
-| only NaN per sign (hence max 448); E5M2 is IEEE-shaped with a quiet bit.
+| Default generated 8-bit NaN, 0x7F in both formats (Zvfofp8min's canonical
+| NaN).  E4M3 has no infinities and S.1111.111 is its only NaN per sign.
 *----------------------------------------------------------------------------*/
 #define defaultNaNF8E4M3UI 0x7F
-#define defaultNaNF8E5M2UI 0x7E
+#define defaultNaNF8E5M2UI 0x7F
 #define defaultNaNF8UI \
     (softfloat_fp8Format == softfloat_fp8_e4m3 ? defaultNaNF8E4M3UI \
                                                : defaultNaNF8E5M2UI)
