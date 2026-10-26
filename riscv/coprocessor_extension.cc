@@ -1,9 +1,9 @@
-// The extension `vcixaccel`: every instruction a loaded accelerator model owns
+// The extension `coprocessor`: every instruction a loaded accelerator model owns
 // is handed to that model's functional face.
 //
-// The model is a library given with --extlib that exports vcix_accel_model().
-// vcix_accel.h is the interface between the two. It is a copy of
-// include/vcix_accel.h of https://github.com/PSAL-POSTECH/vcix-accelerator and
+// The model is a library given with --extlib that exports coprocessor_model().
+// coprocessor.h is the interface between the two. It is a copy of
+// include/coprocessor.h of https://github.com/PSAL-POSTECH/coprocessor and
 // is replaced as a whole, never edited here.
 
 #include "insn_macros.h"
@@ -11,8 +11,8 @@
 #include "mmu.h"
 #include "processor.h"
 #include "trap.h"
-#include "vcix_accel.h"
-#include "vcix_accel_extension.h"
+#include "coprocessor.h"
+#include "coprocessor_extension.h"
 #include <dlfcn.h>
 #include <cstdarg>
 #include <cstdio>
@@ -32,7 +32,7 @@ void refuse(const char* fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  fprintf(stderr, "vcixaccel: ");
+  fprintf(stderr, "coprocessor: ");
   vfprintf(stderr, fmt, args);
   fprintf(stderr, "\n");
   va_end(args);
@@ -44,7 +44,7 @@ void refuse(const char* fmt, ...)
 // ones Spike calls; the timing face is the timing simulator's to check.
 const vcix_model* load_model()
 {
-  void* symbol = dlsym(RTLD_DEFAULT, "vcix_accel_model");
+  void* symbol = dlsym(RTLD_DEFAULT, "coprocessor_model");
   if (!symbol)
     refuse("no accelerator model is loaded; give its library with --extlib=<model.so>");
   Dl_info where;
@@ -52,9 +52,9 @@ const vcix_model* load_model()
 
   const vcix_model* m = reinterpret_cast<const vcix_model* (*)()>(symbol)();
   if (!m)
-    refuse("%s: vcix_accel_model() returned no table", lib);
-  if (m->abi_version != VCIX_ACCEL_ABI_VERSION)
-    refuse("%s has ABI %u, Spike has %u", lib, m->abi_version, VCIX_ACCEL_ABI_VERSION);
+    refuse("%s: coprocessor_model() returned no table", lib);
+  if (m->abi_version != COPROCESSOR_ABI_VERSION)
+    refuse("%s has ABI %u, Spike has %u", lib, m->abi_version, COPROCESSOR_ABI_VERSION);
   if (!m->name)
     refuse("%s: the table has no name", lib);
   if (!m->create || !m->destroy || !m->execute)
@@ -137,13 +137,13 @@ const vcix_host host_template = {
 reg_t dispatch(processor_t* p, insn_t insn, reg_t pc);
 
 // One per hart, and so is the instance of the model it holds.
-class vcix_accel_extension_t : public extension_t
+class coprocessor_extension_t : public extension_t
 {
  public:
-  vcix_accel_extension_t() : self(nullptr) {}
-  ~vcix_accel_extension_t() { if (self) model()->destroy(self); }
+  coprocessor_extension_t() : self(nullptr) {}
+  ~coprocessor_extension_t() { if (self) model()->destroy(self); }
 
-  const char* name() { return "vcixaccel"; }
+  const char* name() { return "coprocessor"; }
 
   void reset()
   {
@@ -218,7 +218,7 @@ reg_t dispatch(processor_t* p, insn_t insn, reg_t pc)
   int vlmul = p->VU.vtype->read() & 0x7;
   vcix_insn decoded = {bits, (uint32_t)p->VU.vl->read(), (uint32_t)p->VU.vsew, vlmul >= 4 ? vlmul - 8 : vlmul};
 
-  auto extension = static_cast<vcix_accel_extension_t*>(p->get_extension("vcixaccel"));
+  auto extension = static_cast<coprocessor_extension_t*>(p->get_extension("coprocessor"));
   model()->execute(extension->get_instance(), &host, &decoded);
 
   // A model runs the instruction to the end, so there is nothing to resume.
@@ -228,7 +228,7 @@ reg_t dispatch(processor_t* p, insn_t insn, reg_t pc)
 
 } // namespace
 
-extension_t* vcix_accel_extension()
+extension_t* coprocessor_extension()
 {
-  return new vcix_accel_extension_t;
+  return new coprocessor_extension_t;
 }

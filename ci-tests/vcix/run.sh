@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # What this fork adds to Spike: --machine-config, the scratchpad, the refusal of an
-# extension that overlaps an implemented encoding, and the extension vcixaccel.
+# extension that overlaps an implemented encoding, and the extension coprocessor.
 # Usage: ci-tests/vcix/run.sh <spike build directory> <pk>
 # Needs gcc, g++ and a RISC-V gcc (RISCV_CC, default riscv64-unknown-elf-gcc).
 set -uo pipefail
@@ -73,7 +73,7 @@ yml good "vpu_num_lanes: 8" "vpu_spad_size_kb_per_lane: $LANE_KB" "vpu_vector_le
 yml moved "vpu_num_lanes: 8" "vpu_spad_size_kb_per_lane: $LANE_KB" "vpu_vector_length_bits: 256" "vpu_spad_base_vaddr: $MOVED"
 # The commands under test. They are spelled out, not shell functions: `timeout` runs a program.
 RUN=("$SPIKE" --isa=rv64gcv)
-ACCEL=("$SPIKE" --isa=rv64gcv_xvcixaccel)
+ACCEL=("$SPIKE" --isa=rv64gcv_xcoprocessor)
 config() { echo "--machine-config=$OUT/$1.yml"; }
 
 echo "-- the scratchpad, from options"
@@ -137,12 +137,12 @@ expect "one claiming a free encoding runs, named in the ISA string" 16 "" \
 expect "one claiming a free encoding runs, given with --extension" 16 "" \
   "$SPIKE" --extlib="$OUT/libfree.so" --extension=claims --isa=rv64gcv "$PK" "$OUT/vlenb"
 
-echo "-- the extension vcixaccel"
+echo "-- the extension coprocessor"
 model model
 lib() { echo "--extlib=$OUT/lib$1.so"; }
 
 expect "custom-2 is illegal without the extension" nonzero "An illegal instruction was executed!" "${RUN[@]}" "$PK" "$OUT/custom2"
-expect "the extension without a model is refused" 1 "vcixaccel: no accelerator model is loaded" \
+expect "the extension without a model is refused" 1 "coprocessor: no accelerator model is loaded" \
   "${ACCEL[@]}" "$PK" "$OUT/custom2"
 expect "the model executes the instruction, on the default machine" 0 "[model] execute 062541db lanes 4 vlen 128" "${ACCEL[@]}" "$(lib model)" "$PK" "$OUT/custom2"
 count  "once" 1 "[model] execute"
@@ -167,13 +167,13 @@ expect "the model reads frm and vtype as the program left them" 0 "[model] frm 3
 expect "and as they are when the program set no frm" 0 "[model] frm 0 vtype d0" "${ACCEL[@]}" "$(lib read_csr)" "$PK" "$OUT/custom2"
 
 # name|what is wrong|what Spike says
-for case in 'no_table|-DNO_TABLE|vcix_accel_model() returned no table' \
-            'other_abi|-DABI=VCIX_ACCEL_ABI_VERSION+1|, Spike has ' \
+for case in 'no_table|-DNO_TABLE|coprocessor_model() returned no table' \
+            'other_abi|-DABI=COPROCESSOR_ABI_VERSION+1|, Spike has ' \
             'no_execute|-DNO_EXECUTE|fork_test: create, destroy or execute is NULL' \
             'custom0|-DOPCODE=0x0b|is not in custom-1 or custom-2' \
-            'bad_lane|-DBAD_LANE|vcixaccel: fork_test: asked for lane 4 of 4' \
-            'bad_register|-DBAD_REGISTER|vcixaccel: fork_test: asked for x register 32 of 32' \
-            'bad_csr|-DBAD_CSR|vcixaccel: fork_test: asked for CSR 0x800, which this hart does not have'; do
+            'bad_lane|-DBAD_LANE|coprocessor: fork_test: asked for lane 4 of 4' \
+            'bad_register|-DBAD_REGISTER|coprocessor: fork_test: asked for x register 32 of 32' \
+            'bad_csr|-DBAD_CSR|coprocessor: fork_test: asked for CSR 0x800, which this hart does not have'; do
   IFS='|' read -r name define says <<< "$case"
   model "$name" "$define"
   expect "a model built with $define is refused" 1 "$says" "${ACCEL[@]}" "$(lib "$name")" "$PK" "$OUT/custom2"

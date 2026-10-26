@@ -5,7 +5,7 @@
 #include "remote_bitbang.h"
 #include "cachesim.h"
 #include "extension.h"
-#include "vcix_accel_extension.h"
+#include "coprocessor_extension.h"
 #include <dlfcn.h>
 #include <fesvr/option_parser.h>
 #include <stdio.h>
@@ -502,7 +502,7 @@ int main(int argc, char** argv)
   parser.option(0, "base-path", 1,
        [&](const char* s){base_path = s;});
 
-  register_extension("vcixaccel", vcix_accel_extension);
+  register_extension("coprocessor", coprocessor_extension);
 
   auto argv1 = parser.parse(argv);
   std::vector<std::string> htif_args(argv1, (const char*const*)argv + argc);

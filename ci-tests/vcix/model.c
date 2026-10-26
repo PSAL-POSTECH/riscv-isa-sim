@@ -4,13 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "vcix_accel.h"
+#include "coprocessor.h"
 
 #ifndef OPCODE
 #define OPCODE 0x5b
 #endif
 #ifndef ABI
-#define ABI VCIX_ACCEL_ABI_VERSION
+#define ABI COPROCESSOR_ABI_VERSION
 #endif
 
 static const vcix_encoding encodings[] = {{OPCODE, 0x7f, "everything"}};
@@ -61,7 +61,7 @@ static const vcix_model table = {
 #endif
 };
 
-__attribute__((visibility("default"))) const vcix_model *vcix_accel_model(void) {
+__attribute__((visibility("default"))) const vcix_model *coprocessor_model(void) {
 #ifdef NO_TABLE
   return NULL;
 #else
