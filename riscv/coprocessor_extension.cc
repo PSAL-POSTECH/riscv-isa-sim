@@ -3,7 +3,7 @@
 //
 // The model is a library given with --extlib that exports coprocessor_model().
 // coprocessor.h is the interface between the two. It is a copy of
-// include/coprocessor.h of https://github.com/PSAL-POSTECH/coprocessor and
+// include/coprocessor.h of https://github.com/PSAL-POSTECH/Coprocessor and
 // is replaced as a whole, never edited here.
 
 #include "insn_macros.h"
